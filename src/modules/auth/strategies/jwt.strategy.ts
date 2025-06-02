@@ -30,7 +30,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<User> {
-    console.log('🚀 ~ JwtStrategy ~ validate ~ user:', payload);
     const user = await this.db.user.findUnique({
       where: { id: payload.sub },
     });
