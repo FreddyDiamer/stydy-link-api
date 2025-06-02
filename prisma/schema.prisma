@@ -1,0 +1,228 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Пользователи системы (студенты и репетиторы)
+model User {
+  id               String    @id @default(uuid())
+  telegramUsername String    @unique
+  telegramId       String    @unique
+  name             String
+  rating           Float     @default(0)
+  balance          Int       @default(0) // в копейках
+  isVerified       Boolean   @default(false)
+  isActive         Boolean   @default(true)
+  lastActivity     DateTime  @default(now())
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Связи
+  // Как репетитор
+  services         Service[]
+  
+  // Как студент  
+  requests         Request[]
+  
+  // Отзывы
+  reviewsGiven     Review[]  @relation("ReviewAuthor")
+  reviewsReceived  Review[]  @relation("ReviewTarget")
+  
+  // Как участник сделок
+  studentDeals     Deal[]    @relation("StudentDeals")
+  tutorDeals       Deal[]    @relation("TutorDeals")
+  
+  @@map("users")
+}
+
+// Предметы
+model Subject {
+  id          String    @id @default(uuid())
+  name        String    @unique // "Математика", "Физика"
+  isActive    Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Связи
+  teacherSubjects TeacherSubject[]
+  services        Service[]
+  requests        Request[]
+  deals           Deal[]
+  
+  @@map("subjects")
+}
+
+// Преподаватели
+model Teacher {
+  id       String  @id @default(uuid())
+  fullName String  // "Иванов Иван Иванович"
+  isActive Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  teacherSubjects TeacherSubject[]
+  services        Service[]
+  requests        Request[]
+  deals           Deal[]
+  
+  @@map("teachers")
+}
+
+// Many-to-Many связь преподавателей и предметов
+model TeacherSubject {
+  id        String @id @default(uuid())
+  teacherId String
+  subjectId String
+  isActive  Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  @@unique([teacherId, subjectId])
+  @@map("teacher_subjects")
+}
+
+// Объявления услуг от репетиторов
+model Service {
+  id          String        @id @default(uuid())
+  tutorId     String
+  subjectId   String
+  teacherId   String
+  price       Int           // в копейках
+  description String?
+  workingHours String?      // "Пн-Пт 18:00-22:00"
+  status      ServiceStatus @default(ACTIVE)
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // Связи
+  tutor       User          @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  subject     Subject       @relation(fields: [subjectId], references: [id])
+  teacher     Teacher       @relation(fields: [teacherId], references: [id])
+  
+  // Заявки на этот сервис
+  deals       Deal[]
+  
+  @@map("services")
+}
+
+// Статусы объявлений
+enum ServiceStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// Заявки на помощь от студентов
+model Request {
+  id          String        @id @default(uuid())
+  studentId   String
+  subjectId   String
+  teacherId   String
+  description String?
+  urgency     Urgency?
+  budget      Int?          // в копейках, максимальная цена
+  status      RequestStatus @default(OPEN)
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // Связи
+  student     User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject     Subject       @relation(fields: [subjectId], references: [id])
+  teacher     Teacher       @relation(fields: [teacherId], references: [id])
+  
+  // Сделки по этой заявке
+  deals       Deal[]
+  
+  @@map("requests")
+}
+
+// Срочность заявки
+enum Urgency {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Статусы заявок
+enum RequestStatus {
+  OPEN
+  MATCHED
+  CLOSED
+  CANCELLED
+}
+
+// Сделки (матчинг студента с репетитором)
+model Deal {
+  id        String     @id @default(uuid())
+  studentId String
+  tutorId   String
+  serviceId String?    // если через объявление
+  requestId String?    // если через заявку
+  subjectId String
+  teacherId String
+  price     Int        // в копейках, согласованная цена
+  status    DealStatus @default(PENDING)
+  
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  
+  // Связи
+  student   User       @relation("StudentDeals", fields: [studentId], references: [id], onDelete: Cascade)
+  tutor     User       @relation("TutorDeals", fields: [tutorId], references: [id], onDelete: Cascade)
+  service   Service?   @relation(fields: [serviceId], references: [id])
+  request   Request?   @relation(fields: [requestId], references: [id])
+  subject   Subject    @relation(fields: [subjectId], references: [id])
+  teacher   Teacher    @relation(fields: [teacherId], references: [id])
+  
+  // Отзыв по сделке
+  review    Review?
+  
+  @@map("deals")
+}
+
+// Статусы сделок
+enum DealStatus {
+  PENDING    // ожидает подтверждения
+  ACCEPTED   // принята
+  IN_PROGRESS // в процессе
+  COMPLETED  // завершена
+  CANCELLED  // отменена
+}
+
+// Отзывы
+model Review {
+  id       String @id @default(uuid())
+  dealId   String @unique
+  authorId String // кто оставил отзыв
+  targetId String // кому оставлен отзыв
+  rating   Int    // 1-5
+  comment  String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  deal     Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  author   User @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  target   User @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  
+  @@map("reviews")
+} 
