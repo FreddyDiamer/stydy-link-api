@@ -1,12 +1,9 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { TelegramAuthDto, AuthResponseDto } from './dto/auth.dto';
-import { Public } from '../../common/decorators/public.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { ApiSuccessResponse } from '../../common/decorators/api-response.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { Public, CurrentUser, ApiSuccessResponse } from '@common';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -26,7 +23,6 @@ export class AuthController {
     return this.authService.loginOrRegister(authDto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiBearerAuth()
   @ApiOperation({
@@ -48,7 +44,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Public()
   @Post('refresh')
   @ApiBearerAuth()
   @ApiOperation({

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 import { DatabaseService } from '../../database/database.service';
-import { BusinessException, NotFoundException } from '../../common';
+import { BusinessException, NotFoundException } from '@common';
 import { TelegramAuthDto, AuthResponseDto } from './dto/auth.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import * as crypto from 'crypto';

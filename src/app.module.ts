@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { JwtAuthGuard, TransformInterceptor } from '@common';
 import { appConfig, databaseConfig, jwtConfig } from './config';
 
 @Module({
@@ -26,6 +26,10 @@ import { appConfig, databaseConfig, jwtConfig } from './config';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TransformInterceptor,
     },
   ],
 })

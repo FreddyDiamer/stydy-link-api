@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { User, Prisma } from '@prisma/client';
 import { DatabaseService } from '../../database/database.service';
-import { BaseService } from '../../common/services/base.service';
-import { NotFoundException, BusinessException } from '../../common';
 import { CreateUserDto, UpdateUserDto, UserFilterDto } from './dto/user.dto';
-import { PaginationDto, PaginatedResult } from '../../common';
+import {
+  BaseService,
+  BusinessException,
+  NotFoundException,
+  PaginatedResult,
+  PaginationDto,
+} from '@common';
 
 @Injectable()
 export class UsersService extends BaseService {

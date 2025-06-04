@@ -7,35 +7,27 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
+  ApiResponse,
   ApiBearerAuth,
-  ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { UsersService } from './users.service';
 import {
   CreateUserDto,
   UpdateUserDto,
-  UserFilterDto,
   UserResponseDto,
+  UserFilterDto,
 } from './dto/user.dto';
-import { PaginationDto } from '../../common/dto/pagination.dto';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import {
-  ApiSuccessResponse,
-  ApiCreatedResponse,
-  ApiPaginatedResponse,
-} from '../../common/decorators/api-response.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PaginationDto, CurrentUser, ApiSuccessResponse } from '@common';
 
 @ApiTags('Users')
 @Controller('users')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -45,7 +37,7 @@ export class UsersController {
     summary: 'Создать пользователя',
     description: 'Создание нового пользователя',
   })
-  @ApiCreatedResponse(UserResponseDto)
+  @ApiSuccessResponse(UserResponseDto)
   async create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
@@ -55,7 +47,7 @@ export class UsersController {
     summary: 'Получить список пользователей',
     description: 'Получить список пользователей с фильтрацией и пагинацией',
   })
-  @ApiPaginatedResponse(UserResponseDto)
+  @ApiSuccessResponse(UserResponseDto)
   async findAll(
     @Query() paginationDto: PaginationDto,
     @Query() filterDto: UserFilterDto,
@@ -78,7 +70,7 @@ export class UsersController {
     summary: 'Получить пользователей с услугами',
     description: 'Получить список пользователей которые предоставляют услуги',
   })
-  @ApiPaginatedResponse(UserResponseDto)
+  @ApiSuccessResponse(UserResponseDto)
   async findUsersWithServices(
     @Query() paginationDto: PaginationDto,
     @Query() filterDto: UserFilterDto,
@@ -91,7 +83,7 @@ export class UsersController {
     summary: 'Получить пользователей с заявками',
     description: 'Получить список пользователей которые создают заявки',
   })
-  @ApiPaginatedResponse(UserResponseDto)
+  @ApiSuccessResponse(UserResponseDto)
   async findUsersWithRequests(
     @Query() paginationDto: PaginationDto,
     @Query() filterDto: UserFilterDto,
@@ -104,7 +96,6 @@ export class UsersController {
     summary: 'Получить пользователя по ID',
     description: 'Получить подробную информацию о пользователе',
   })
-  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiSuccessResponse(UserResponseDto)
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findOne(id);
@@ -115,7 +106,6 @@ export class UsersController {
     summary: 'Получить статистику пользователя',
     description: 'Получить статистику по услугам и заявкам пользователя',
   })
-  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiSuccessResponse()
   async getStats(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.getUserStats(id);
@@ -141,7 +131,6 @@ export class UsersController {
     summary: 'Обновить пользователя',
     description: 'Обновить информацию о пользователе',
   })
-  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiSuccessResponse(UserResponseDto)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -155,7 +144,6 @@ export class UsersController {
     summary: 'Верифицировать пользователя',
     description: 'Установить статус верификации пользователя',
   })
-  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiSuccessResponse(UserResponseDto)
   async verify(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.verify(id);
@@ -166,7 +154,6 @@ export class UsersController {
     summary: 'Снять верификацию пользователя',
     description: 'Убрать статус верификации пользователя',
   })
-  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiSuccessResponse(UserResponseDto)
   async unverify(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.unverify(id);
@@ -177,7 +164,6 @@ export class UsersController {
     summary: 'Деактивировать пользователя',
     description: 'Деактивировать аккаунт пользователя',
   })
-  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiSuccessResponse(UserResponseDto)
   async deactivate(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.deactivate(id);
@@ -188,7 +174,6 @@ export class UsersController {
     summary: 'Активировать пользователя',
     description: 'Активировать аккаунт пользователя',
   })
-  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiSuccessResponse(UserResponseDto)
   async activate(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.activate(id);
@@ -199,7 +184,6 @@ export class UsersController {
     summary: 'Удалить пользователя',
     description: 'Полностью удалить пользователя из системы',
   })
-  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiSuccessResponse()
   async remove(@Param('id', ParseUUIDPipe) id: string) {
     await this.usersService.remove(id);

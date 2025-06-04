@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { User } from '@prisma/client';
-import { DatabaseService } from '../../../database/database.service';
-import { UnauthorizedException } from '../../../common';
+import { UnauthorizedException } from '@common';
+import { DatabaseService } from '@database/database.service';
 
 export interface JwtPayload {
   sub: string; // user id
@@ -34,8 +34,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { id: payload.sub },
     });
 
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('Invalid or inactive user');
+    if (!user) {
+      throw new UnauthorizedException('Invalid user');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Inactive user');
     }
 
     // Обновляем последнюю активность
