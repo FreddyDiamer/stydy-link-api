@@ -1,30 +1,45 @@
 import { IsString, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
+export interface TelegramUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+  is_premium?: boolean;
+  allows_write_to_pm?: boolean;
+  photo_url?: string;
+}
+
+export interface TelegramInitData {
+  query_id?: string;
+  user: TelegramUser;
+  receiver?: TelegramUser;
+  chat?: {
+    id: number;
+    type: string;
+    title?: string;
+    username?: string;
+    photo_url?: string;
+  };
+  chat_type?: string;
+  chat_instance?: string;
+  start_param?: string;
+  can_send_after?: number;
+  auth_date: number;
+  hash: string;
+}
+
 export class TelegramAuthDto {
   @ApiProperty({
-    description: 'Telegram user ID',
-    example: '123456789',
+    description: 'Telegram WebApp initData строка',
+    example:
+      'query_id=AAGpdtYyAAAAAKl21jLf3CLz&user=%7B%22id%22%3A852915881%2C%22first_name%22%3A%22Freddy%22%2C%22last_name%22%3A%22%22%2C%22username%22%3A%22FreddyDiamer%22%2C%22language_code%22%3A%22en%22%7D&auth_date=1749294661&hash=3e25de3481f5da2e4c436d40b8bb0c0aa19be9ce8c63094accc267f70afccfab',
   })
   @IsString()
   @IsNotEmpty()
-  telegramId: string;
-
-  @ApiProperty({
-    description: 'Telegram username',
-    example: 'john_doe',
-  })
-  @IsString()
-  @IsNotEmpty()
-  telegramUsername: string;
-
-  @ApiProperty({
-    description: 'User full name',
-    example: 'Иван Иванов',
-  })
-  @IsString()
-  @IsNotEmpty()
-  name: string;
+  initData: string;
 }
 
 export class AuthResponseDto {

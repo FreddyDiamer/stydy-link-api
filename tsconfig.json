@@ -19,7 +19,7 @@
     "noFallthroughCasesInSwitch": false,
     "paths": {
       "@common/*": ["common/*"],
-      "@common": ["common/index.ts"],
+      "@common": ["common"],
       "@config/*": ["config/*"],
       "@database/*": ["database/*"],
       "@modules/*": ["modules/*"]

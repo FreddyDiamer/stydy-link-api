@@ -44,8 +44,7 @@ export class AuthController {
     };
   }
 
-  @Public()
-  @Post('refresh')
+  @Get('refresh')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Обновить токен',
@@ -53,10 +52,16 @@ export class AuthController {
   })
   @ApiSuccessResponse(AuthResponseDto)
   async refreshToken(@CurrentUser() user: User): Promise<AuthResponseDto> {
-    return this.authService.loginOrRegister({
-      telegramId: user.telegramId,
-      telegramUsername: user.telegramUsername,
-      name: user.name,
-    });
+    const accessToken = await this.authService.generateAccessToken(user);
+
+    return {
+      accessToken,
+      user: {
+        id: user.id,
+        telegramUsername: user.telegramUsername,
+        name: user.name,
+        isVerified: user.isVerified,
+      },
+    };
   }
 }

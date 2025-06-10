@@ -4,7 +4,11 @@ import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 import { DatabaseService } from '../../database/database.service';
 import { BusinessException, NotFoundException } from '@common';
-import { TelegramAuthDto, AuthResponseDto } from './dto/auth.dto';
+import {
+  TelegramAuthDto,
+  AuthResponseDto,
+  TelegramInitData,
+} from './dto/auth.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import * as crypto from 'crypto';
 
@@ -18,22 +22,37 @@ export class AuthService {
 
   async loginOrRegister(authDto: TelegramAuthDto): Promise<AuthResponseDto> {
     try {
+      // Валидируем initData строку
+      const botToken = this.configService.get<string>('telegram.botToken');
+      if (
+        botToken &&
+        !this.validateTelegramInitData(authDto.initData, botToken)
+      ) {
+        throw new BusinessException('Invalid Telegram authentication data');
+      }
+
+      // Парсим данные из initData
+      const telegramData = this.parseInitData(authDto.initData);
+      const telegramUser = telegramData.user;
+
+      // Формируем данные пользователя
+      const telegramId = telegramUser.id.toString();
+      const telegramUsername = telegramUser.username || '';
+      const name = `${telegramUser.first_name}${telegramUser.last_name ? ' ' + telegramUser.last_name : ''}`;
+
       // Ищем существующего пользователя
       let user = await this.db.user.findUnique({
-        where: { telegramId: authDto.telegramId },
+        where: { telegramId },
       });
 
       if (user) {
         // Обновляем данные если изменились
-        if (
-          user.telegramUsername !== authDto.telegramUsername ||
-          user.name !== authDto.name
-        ) {
+        if (user.telegramUsername !== telegramUsername || user.name !== name) {
           user = await this.db.user.update({
             where: { id: user.id },
             data: {
-              telegramUsername: authDto.telegramUsername,
-              name: authDto.name,
+              telegramUsername,
+              name,
               lastActivity: new Date(),
             },
           });
@@ -42,9 +61,9 @@ export class AuthService {
         // Создаем нового пользователя
         user = await this.db.user.create({
           data: {
-            telegramId: authDto.telegramId,
-            telegramUsername: authDto.telegramUsername,
-            name: authDto.name,
+            telegramId,
+            telegramUsername,
+            name,
           },
         });
       }
@@ -66,12 +85,69 @@ export class AuthService {
         },
       };
     } catch (error) {
-      console.log('🚀 ~ AuthService ~ loginOrRegister ~ error:', error);
-
       if (error instanceof BusinessException) {
         throw error;
       }
       throw new BusinessException('Authentication failed');
+    }
+  }
+
+  private parseInitData(initData: string): TelegramInitData {
+    try {
+      const params = new URLSearchParams(initData);
+      const result: any = {};
+
+      for (const [key, value] of params.entries()) {
+        if (key === 'user' || key === 'receiver' || key === 'chat') {
+          result[key] = JSON.parse(decodeURIComponent(value));
+        } else if (key === 'auth_date' || key === 'can_send_after') {
+          result[key] = parseInt(value, 10);
+        } else {
+          result[key] = value;
+        }
+      }
+
+      return result as TelegramInitData;
+    } catch (error) {
+      throw new BusinessException('Failed to parse Telegram init data');
+    }
+  }
+
+  private validateTelegramInitData(
+    initData: string,
+    botToken: string,
+  ): boolean {
+    try {
+      const params = new URLSearchParams(initData);
+      const hash = params.get('hash');
+
+      if (!hash) {
+        return false;
+      }
+
+      params.delete('hash');
+
+      // Создаем строку для проверки
+      const dataCheckString = Array.from(params.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}=${value}`)
+        .join('\n');
+
+      // Генерируем секретный ключ
+      const secretKey = crypto
+        .createHmac('sha256', 'WebAppData')
+        .update(botToken)
+        .digest();
+
+      // Вычисляем hash
+      const calculatedHash = crypto
+        .createHmac('sha256', secretKey)
+        .update(dataCheckString)
+        .digest('hex');
+
+      return calculatedHash === hash;
+    } catch (error) {
+      return false;
     }
   }
 
@@ -103,27 +179,5 @@ export class AuthService {
       secret: this.configService.get<string>('jwt.secret'),
       expiresIn: this.configService.get<string>('jwt.expiresIn'),
     });
-  }
-
-  private validateTelegramData(initData: string, botToken: string): boolean {
-    const url = new URLSearchParams(initData);
-    const hash = url.get('hash');
-    url.delete('hash');
-
-    const dataCheckString = Array.from(url.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, value]) => `${key}=${value}`)
-      .join('\n');
-
-    const secretKey = crypto
-      .createHmac('sha256', 'WebAppData')
-      .update(botToken)
-      .digest();
-    const calculatedHash = crypto
-      .createHmac('sha256', secretKey)
-      .update(dataCheckString)
-      .digest('hex');
-
-    return calculatedHash === hash;
   }
 }
