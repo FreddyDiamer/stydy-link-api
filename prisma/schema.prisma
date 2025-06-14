@@ -1,6 +1,10 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,7 +14,41 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Пользователи системы (студенты и репетиторы)
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum ServiceStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum Urgency {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum RequestStatus {
+  OPEN
+  MATCHED
+  CLOSED
+  CANCELLED
+}
+
+enum DealStatus {
+  PENDING     // ожидает подтверждения
+  ACCEPTED    // принята
+  IN_PROGRESS // в процессе
+  COMPLETED   // завершена
+  CANCELLED   // отменена
+} 
+
+// =============================================================================
+// CORE ENTITIES
+// =============================================================================
+
 model User {
   id               String    @id @default(uuid())
   telegramUsername String    @unique
@@ -43,7 +81,10 @@ model User {
   @@map("users")
 }
 
-// Предметы
+// =============================================================================
+// EDUCATION DOMAIN
+// =============================================================================
+
 model Subject {
   id          String    @id @default(uuid())
   name        String    @unique // "Математика", "Физика"
@@ -61,7 +102,6 @@ model Subject {
   @@map("subjects")
 }
 
-// Преподаватели
 model Teacher {
   id       String  @id @default(uuid())
   fullName String  // "Иванов Иван Иванович"
@@ -79,7 +119,6 @@ model Teacher {
   @@map("teachers")
 }
 
-// Many-to-Many связь преподавателей и предметов
 model TeacherSubject {
   id        String @id @default(uuid())
   teacherId String
@@ -97,7 +136,10 @@ model TeacherSubject {
   @@map("teacher_subjects")
 }
 
-// Объявления услуг от репетиторов
+// =============================================================================
+// MARKETPLACE DOMAIN
+// =============================================================================
+
 model Service {
   id          String        @id @default(uuid())
   tutorId     String
@@ -122,14 +164,6 @@ model Service {
   @@map("services")
 }
 
-// Статусы объявлений
-enum ServiceStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-}
-
-// Заявки на помощь от студентов
 model Request {
   id          String        @id @default(uuid())
   studentId   String
@@ -154,22 +188,6 @@ model Request {
   @@map("requests")
 }
 
-// Срочность заявки
-enum Urgency {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-// Статусы заявок
-enum RequestStatus {
-  OPEN
-  MATCHED
-  CLOSED
-  CANCELLED
-}
-
-// Сделки (матчинг студента с репетитором)
 model Deal {
   id        String     @id @default(uuid())
   studentId String
@@ -198,16 +216,10 @@ model Deal {
   @@map("deals")
 }
 
-// Статусы сделок
-enum DealStatus {
-  PENDING    // ожидает подтверждения
-  ACCEPTED   // принята
-  IN_PROGRESS // в процессе
-  COMPLETED  // завершена
-  CANCELLED  // отменена
-}
+// =============================================================================
+// FEEDBACK SYSTEM
+// =============================================================================
 
-// Отзывы
 model Review {
   id       String @id @default(uuid())
   dealId   String @unique
@@ -225,4 +237,4 @@ model Review {
   target   User @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Cascade)
   
   @@map("reviews")
-} 
+}
