@@ -43,6 +43,13 @@ enum DealStatus {
   IN_PROGRESS // в процессе
   COMPLETED   // завершена
   CANCELLED   // отменена
+}
+
+enum ResponseStatus {
+  PENDING   // ожидает ответа
+  ACCEPTED  // принят
+  REJECTED  // отклонен
+  EXPIRED   // истек срок
 } 
 
 // =============================================================================
@@ -73,6 +80,10 @@ model User {
   // Отзывы
   reviewsGiven     Review[]  @relation("ReviewAuthor")
   reviewsReceived  Review[]  @relation("ReviewTarget")
+  
+  // Отклики
+  serviceResponses ServiceResponse[] @relation("StudentServiceResponses")
+  requestResponses RequestResponse[] @relation("TutorRequestResponses")
   
   // Как участник сделок
   studentDeals     Deal[]    @relation("StudentDeals")
@@ -161,6 +172,9 @@ model Service {
   // Заявки на этот сервис
   deals       Deal[]
   
+  // Отклики на услугу
+  responses   ServiceResponse[]
+  
   @@map("services")
 }
 
@@ -185,6 +199,9 @@ model Request {
   // Сделки по этой заявке
   deals       Deal[]
   
+  // Отклики на заявку
+  responses   RequestResponse[]
+  
   @@map("requests")
 }
 
@@ -199,6 +216,9 @@ model Deal {
   price     Int        // в копейках, согласованная цена
   status    DealStatus @default(PENDING)
   
+  serviceResponseId String? @unique
+  requestResponseId String? @unique
+  
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   
@@ -210,10 +230,54 @@ model Deal {
   subject   Subject    @relation(fields: [subjectId], references: [id])
   teacher   Teacher    @relation(fields: [teacherId], references: [id])
   
+  // Отклики, из которых создана сделка
+  serviceResponse ServiceResponse? @relation("ServiceResponseDeal", fields: [serviceResponseId], references: [id])
+  requestResponse RequestResponse? @relation("RequestResponseDeal", fields: [requestResponseId], references: [id])
+  
   // Отзыв по сделке
   review    Review?
   
   @@map("deals")
+}
+
+model ServiceResponse {
+  id        String         @id @default(uuid())
+  studentId String         // студент откликается на услугу
+  serviceId String
+  message   String?        // сообщение при отклике
+  price     Int?           // предложенная цена студента
+  status    ResponseStatus @default(PENDING)
+  
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  
+  // Связи
+  student   User           @relation("StudentServiceResponses", fields: [studentId], references: [id], onDelete: Cascade)
+  service   Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  deal      Deal?          @relation("ServiceResponseDeal")
+  
+  @@unique([studentId, serviceId])
+  @@map("service_responses")
+}
+
+model RequestResponse {
+  id        String         @id @default(uuid())
+  tutorId   String         // репетитор откликается на заявку
+  requestId String
+  message   String?        // сообщение при отклике
+  price     Int?           // предложенная цена репетитора
+  status    ResponseStatus @default(PENDING)
+  
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  
+  // Связи
+  tutor     User           @relation("TutorRequestResponses", fields: [tutorId], references: [id], onDelete: Cascade)
+  request   Request        @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  deal      Deal?          @relation("RequestResponseDeal")
+  
+  @@unique([tutorId, requestId])
+  @@map("request_responses")
 }
 
 // =============================================================================
