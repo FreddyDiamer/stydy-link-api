@@ -52,6 +52,8 @@ enum ResponseStatus {
   EXPIRED   // истек срок
 } 
 
+
+
 // =============================================================================
 // CORE ENTITIES
 // =============================================================================
@@ -70,8 +72,6 @@ model User {
   // System fields
   rating           Float     @default(0)
   balance          Int       @default(0) // в копейках
-  isVerified       Boolean   @default(false)
-  isActive         Boolean   @default(true)
   lastActivity     DateTime  @default(now())
   
   createdAt        DateTime  @default(now())
@@ -168,6 +168,9 @@ model Service {
   workingHours String?      // "Пн-Пт 18:00-22:00"
   status      ServiceStatus @default(ACTIVE)
   
+  // Срок выполнения (для услуг с временными рамками)
+  deadline DateTime?
+  
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   
@@ -176,10 +179,7 @@ model Service {
   subject     Subject       @relation(fields: [subjectId], references: [id])
   teacher     Teacher       @relation(fields: [teacherId], references: [id])
   
-  // Заявки на этот сервис
-  deals       Deal[]
-  
-  // Отклики на услугу
+  // Отклики на услугу (через них создаются сделки)
   responses   ServiceResponse[]
   
   @@map("services")
@@ -195,6 +195,9 @@ model Request {
   budget      Int?          // в копейках, максимальная цена
   status      RequestStatus @default(OPEN)
   
+  // Срок выполнения
+  deadline DateTime?
+  
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   
@@ -203,10 +206,7 @@ model Request {
   subject     Subject       @relation(fields: [subjectId], references: [id])
   teacher     Teacher       @relation(fields: [teacherId], references: [id])
   
-  // Сделки по этой заявке
-  deals       Deal[]
-  
-  // Отклики на заявку
+  // Отклики на заявку (через них создаются сделки)
   responses   RequestResponse[]
   
   @@map("requests")
@@ -216,13 +216,13 @@ model Deal {
   id        String     @id @default(uuid())
   studentId String
   tutorId   String
-  serviceId String?    // если через объявление
-  requestId String?    // если через заявку
   subjectId String
   teacherId String
   price     Int        // в копейках, согласованная цена
+  deadline  DateTime?  // согласованная дата выполнения
   status    DealStatus @default(PENDING)
   
+  // Deal создается только из принятого отклика
   serviceResponseId String? @unique
   requestResponseId String? @unique
   
@@ -232,8 +232,6 @@ model Deal {
   // Связи
   student   User       @relation("StudentDeals", fields: [studentId], references: [id], onDelete: Cascade)
   tutor     User       @relation("TutorDeals", fields: [tutorId], references: [id], onDelete: Cascade)
-  service   Service?   @relation(fields: [serviceId], references: [id])
-  request   Request?   @relation(fields: [requestId], references: [id])
   subject   Subject    @relation(fields: [subjectId], references: [id])
   teacher   Teacher    @relation(fields: [teacherId], references: [id])
   
@@ -253,6 +251,7 @@ model ServiceResponse {
   serviceId String
   message   String?        // сообщение при отклике
   price     Int?           // предложенная цена студента
+  proposedDeadline DateTime? // предложенная дата выполнения
   status    ResponseStatus @default(PENDING)
   
   createdAt DateTime       @default(now())
@@ -273,6 +272,7 @@ model RequestResponse {
   requestId String
   message   String?        // сообщение при отклике
   price     Int?           // предложенная цена репетитора
+  proposedDeadline DateTime? // предложенная дата выполнения
   status    ResponseStatus @default(PENDING)
   
   createdAt DateTime       @default(now())
