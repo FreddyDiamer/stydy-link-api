@@ -56,6 +56,5 @@ export class AuthResponseDto {
     id: string;
     telegramUsername: string;
     name: string;
-    isVerified: boolean;
   };
 }

@@ -39,7 +39,6 @@ export class AuthController {
         id: user.id,
         telegramUsername: user.telegramUsername,
         name: user.name,
-        isVerified: user.isVerified,
       },
     };
   }
@@ -60,7 +59,6 @@ export class AuthController {
         id: user.id,
         telegramUsername: user.telegramUsername,
         name: user.name,
-        isVerified: user.isVerified,
       },
     };
   }

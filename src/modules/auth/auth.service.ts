@@ -68,10 +68,6 @@ export class AuthService {
         });
       }
 
-      if (!user.isActive) {
-        throw new BusinessException('User account is deactivated');
-      }
-
       // Генерируем JWT токен
       const accessToken = await this.generateAccessToken(user);
 
@@ -81,7 +77,6 @@ export class AuthService {
           id: user.id,
           telegramUsername: user.telegramUsername,
           name: user.name,
-          isVerified: user.isVerified,
         },
       };
     } catch (error) {

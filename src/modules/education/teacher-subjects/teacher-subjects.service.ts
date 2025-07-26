@@ -122,10 +122,6 @@ export class TeacherSubjectsService extends BaseService {
         where.subjectId = filterDto.subjectId;
       }
 
-      if (filterDto.isActive !== undefined) {
-        where.isActive = filterDto.isActive;
-      }
-
       // Поиск по имени преподавателя
       if (filterDto.teacherName?.trim()) {
         where.teacher = {

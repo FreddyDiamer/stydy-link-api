@@ -71,11 +71,6 @@ export class SubjectsService extends BaseService {
     try {
       const where: Prisma.SubjectWhereInput = {};
 
-      // Фильтр по активности
-      if (filterDto.isActive !== undefined) {
-        where.isActive = filterDto.isActive;
-      }
-
       // Поиск по названию
       if (filterDto.search?.trim()) {
         where.name = {

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ServicesModule } from './services/services.module';
 import { RequestsModule } from './requests/requests.module';
 import { ServiceResponsesModule } from './service-responses/service-responses.module';
+import { RequestResponsesModule } from './request-responses/request-responses.module';
+import { DealsModule } from './deals/deals.module';
 
 /**
  * Домен Marketplace - торговая площадка репетиторских услуг
@@ -21,15 +23,15 @@ import { ServiceResponsesModule } from './service-responses/service-responses.mo
     ServicesModule,
     RequestsModule,
     ServiceResponsesModule,
-    // TODO: добавить RequestResponsesModule
-    // TODO: добавить DealsModule
+    RequestResponsesModule,
+    DealsModule,
   ],
   exports: [
     ServicesModule,
     RequestsModule,
     ServiceResponsesModule,
-    // TODO: добавить RequestResponsesModule
-    // TODO: добавить DealsModule
+    RequestResponsesModule,
+    DealsModule,
   ],
 })
 export class MarketplaceModule {}

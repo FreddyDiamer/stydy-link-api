@@ -38,10 +38,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid user');
     }
 
-    if (!user.isActive) {
-      throw new UnauthorizedException('Inactive user');
-    }
-
     // Обновляем последнюю активность
     await this.db.user.update({
       where: { id: user.id },

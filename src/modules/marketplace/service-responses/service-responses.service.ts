@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, ServiceResponse, User } from '@prisma/client';
 import { DatabaseService } from '../../../database/database.service';
 import {
   CreateServiceResponseDto,
@@ -449,11 +449,38 @@ export class ServiceResponsesService extends BaseService {
     }
   }
 
-  async accept(id: string): Promise<ServiceResponse> {
+  async accept(id: string, user: User): Promise<ServiceResponse> {
+    // Проверяем, что отклик принимает владелец услуги
+    const response = await this.findOne(id);
+    const service = await this.db.service.findUnique({
+      where: { id: response.serviceId },
+    });
+
+    if (!service) {
+      throw new NotFoundException('Service', response.serviceId);
+    }
+
+    if (service.tutorId !== user.id) {
+      throw new Error('Только автор услуги может принимать отклики');
+    }
     return this.update(id, { status: 'ACCEPTED' as any });
   }
 
-  async reject(id: string): Promise<ServiceResponse> {
+  async reject(id: string, user: User): Promise<ServiceResponse> {
+    // Проверяем, что отклик принимает владелец услуги
+    const response = await this.findOne(id);
+    const service = await this.db.service.findUnique({
+      where: { id: response.serviceId },
+    });
+
+    if (!service) {
+      throw new NotFoundException('Service', response.serviceId);
+    }
+
+    if (service.tutorId !== user.id) {
+      throw new Error('Только автор услуги может принимать отклики');
+    }
+
     return this.update(id, { status: 'REJECTED' as any });
   }
 
@@ -501,12 +528,8 @@ export class ServiceResponsesService extends BaseService {
         status: response.status,
         price: response.price,
         createdAt: response.createdAt,
-        student: response.student,
-        service: {
-          id: response.service.id,
-          price: response.service.price,
-          tutor: response.service.tutor,
-        },
+        student: response.studentId,
+        service: response.serviceId,
       },
       stats: {
         hasDeal: false,

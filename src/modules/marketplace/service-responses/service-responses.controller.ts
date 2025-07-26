@@ -153,12 +153,7 @@ export class ServiceResponsesController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
   ) {
-    // Проверяем, что отклик принимает владелец услуги
-    const response = await this.serviceResponsesService.findOne(id);
-    if (response.service.tutorId !== user.id) {
-      throw new Error('Только автор услуги может принимать отклики');
-    }
-    return this.serviceResponsesService.accept(id);
+    return this.serviceResponsesService.accept(id, user);
   }
 
   @Patch(':id/reject')
@@ -171,12 +166,7 @@ export class ServiceResponsesController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
   ) {
-    // Проверяем, что отклик отклоняет владелец услуги
-    const response = await this.serviceResponsesService.findOne(id);
-    if (response.service.tutorId !== user.id) {
-      throw new Error('Только автор услуги может отклонять отклики');
-    }
-    return this.serviceResponsesService.reject(id);
+    return this.serviceResponsesService.reject(id, user);
   }
 
   @Delete(':id')

@@ -161,16 +161,14 @@ export class ServicesService extends BaseService {
       }
 
       // Фильтр по дедлайну
-      if (filterDto.minDeadline) {
-        where.deadline = {
-          gte: new Date(filterDto.minDeadline),
-        };
-      }
-      if (filterDto.maxDeadline) {
-        where.deadline = {
-          ...where.deadline,
-          lte: new Date(filterDto.maxDeadline),
-        };
+      if (filterDto.deadlineAfter || filterDto.deadlineBefore) {
+        where.deadline = {};
+        if (filterDto.deadlineAfter) {
+          where.deadline.gte = new Date(filterDto.deadlineAfter);
+        }
+        if (filterDto.deadlineBefore) {
+          where.deadline.lte = new Date(filterDto.deadlineBefore);
+        }
       }
 
       // Поиск в описании
@@ -445,9 +443,7 @@ export class ServicesService extends BaseService {
         }),
         this.db.deal.count({
           where: {
-            serviceResponseId: {
-              in: service.responses?.map((r) => r.id) || [],
-            },
+            serviceResponse: { serviceId: id },
           },
         }),
       ]);
@@ -519,9 +515,9 @@ export class ServicesService extends BaseService {
         status: service.status,
         price: service.price,
         createdAt: service.createdAt,
-        tutor: service.tutor,
-        subject: service.subject,
-        teacher: service.teacher,
+        tutor: service.tutorId,
+        subject: service.subjectId,
+        teacher: service.teacherId,
       },
       stats: {
         totalResponses: totalResponsesCount,

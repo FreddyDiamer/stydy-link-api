@@ -61,19 +61,6 @@ export class UsersService extends BaseService {
     try {
       const where: Prisma.UserWhereInput = {};
 
-      // Фильтры
-      if (filterDto.isActive !== undefined) {
-        where.isActive = filterDto.isActive;
-      }
-
-      if (filterDto.isVerified !== undefined) {
-        where.isVerified = filterDto.isVerified;
-      }
-
-      if (filterDto.minRating !== undefined) {
-        where.rating = { gte: filterDto.minRating };
-      }
-
       // Поиск по имени или username
       if (filterDto.search) {
         where.OR = [
@@ -122,7 +109,6 @@ export class UsersService extends BaseService {
           include: { subject: true, teacher: true },
         },
         requests: {
-          where: { status: 'OPEN' },
           include: { subject: true, teacher: true },
         },
       },
@@ -243,9 +229,9 @@ export class UsersService extends BaseService {
       this.db.service.count({
         where: { tutorId: userId, status: 'ACTIVE' },
       }),
-      // Открытые заявки (как студент)
+      // Заявки (как студент)
       this.db.request.count({
-        where: { studentId: userId, status: 'OPEN' },
+        where: { studentId: userId },
       }),
       // Завершенные сделки как репетитор
       this.db.deal.count({
