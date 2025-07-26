@@ -17,7 +17,12 @@ import {
   ServiceResponseDto,
   ServiceFilterDto,
 } from './dto/service.dto';
-import { PaginationDto, ApiSuccessResponse, CurrentUser } from '@common';
+import {
+  PaginationDto,
+  ApiSuccessResponse,
+  CurrentUser,
+  BusinessException,
+} from '@common';
 import { User } from '@prisma/client';
 
 @ApiTags('Marketplace - Services')
@@ -38,7 +43,9 @@ export class ServicesController {
   ) {
     // Проверяем, что пользователь создает услугу для себя
     if (createServiceDto.tutorId !== user.id) {
-      throw new Error('Нельзя создавать услуги от имени других пользователей');
+      throw new BusinessException(
+        'Нельзя создавать услуги от имени других пользователей',
+      );
     }
     return this.servicesService.create(createServiceDto);
   }
