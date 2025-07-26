@@ -30,13 +30,6 @@ enum Urgency {
   HIGH
 }
 
-enum RequestStatus {
-  OPEN
-  MATCHED
-  CLOSED
-  CANCELLED
-}
-
 enum DealStatus {
   PENDING     // ожидает подтверждения
   ACCEPTED    // принята
@@ -50,9 +43,12 @@ enum ResponseStatus {
   ACCEPTED  // принят
   REJECTED  // отклонен
   EXPIRED   // истек срок
-} 
+}
 
-
+enum UserRole {
+  TUTOR
+  STUDENT
+}
 
 // =============================================================================
 // CORE ENTITIES
@@ -70,7 +66,6 @@ model User {
   avatarUrl        String?   // ссылка на фото профиля
   
   // System fields
-  rating           Float     @default(0)
   balance          Int       @default(0) // в копейках
   lastActivity     DateTime  @default(now())
   
@@ -123,7 +118,7 @@ model Subject {
 model Teacher {
   id       String  @id @default(uuid())
   fullName String  // "Иванов Иван Иванович"
-  isActive Boolean @default(true)
+  foreignId String
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -165,7 +160,6 @@ model Service {
   teacherId   String
   price       Int           // в копейках
   description String?
-  workingHours String?      // "Пн-Пт 18:00-22:00"
   status      ServiceStatus @default(ACTIVE)
   
   // Срок выполнения (для услуг с временными рамками)
@@ -191,9 +185,7 @@ model Request {
   subjectId   String
   teacherId   String
   description String?
-  urgency     Urgency?
   budget      Int?          // в копейках, максимальная цена
-  status      RequestStatus @default(OPEN)
   
   // Срок выполнения
   deadline DateTime?
@@ -298,6 +290,9 @@ model Review {
   targetId String // кому оставлен отзыв
   rating   Int    // 1-5
   comment  String?
+  
+  // Роль цели отзыва (для правильного обновления статистики)
+  targetRole UserRole // TUTOR или STUDENT 
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
