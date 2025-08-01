@@ -49,11 +49,9 @@ export class RequestsController {
     description: 'Получить список заявок студентов с фильтрацией и пагинацией',
   })
   @ApiSuccessResponse(RequestResponseDto)
-  async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: RequestFilterDto,
-  ) {
-    return this.requestsService.findAll(paginationDto, filterDto);
+  async findAll(@Query() filterDto: RequestFilterDto) {
+    console.log('🚀 ~ RequestsController ~ findAll ~ filterDto:', filterDto);
+    return this.requestsService.findAll(filterDto);
   }
 
   @Get('open')

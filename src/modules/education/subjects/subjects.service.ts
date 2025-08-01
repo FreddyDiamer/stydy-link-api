@@ -67,7 +67,7 @@ export class SubjectsService extends BaseService {
   async findAll(
     paginationDto: PaginationDto,
     filterDto: SubjectFilterDto,
-  ): Promise<PaginatedResult<Subject>> {
+  ): Promise<Subject[]> {
     try {
       const where: Prisma.SubjectWhereInput = {};
 
@@ -79,44 +79,35 @@ export class SubjectsService extends BaseService {
         };
       }
 
-      const [items, total] = await Promise.all([
-        this.db.subject.findMany({
-          where,
-          skip: paginationDto.skip,
-          take: paginationDto.limit,
-          orderBy: { name: 'asc' },
-          include: {
-            teacherSubjects: {
-              where: { isActive: true },
-              include: {
-                teacher: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                  },
+      const subjects = await this.db.subject.findMany({
+        where,
+        skip: paginationDto.skip,
+        take: paginationDto.limit,
+        orderBy: { name: 'asc' },
+        include: {
+          teacherSubjects: {
+            where: { isActive: true },
+            include: {
+              teacher: {
+                select: {
+                  id: true,
+                  fullName: true,
                 },
               },
-              orderBy: { teacher: { fullName: 'asc' } },
             },
-            _count: {
-              select: {
-                services: { where: { status: 'ACTIVE' } },
-                requests: true,
-                deals: true,
-              },
+            orderBy: { teacher: { fullName: 'asc' } },
+          },
+          _count: {
+            select: {
+              services: { where: { status: 'ACTIVE' } },
+              requests: true,
+              deals: true,
             },
           },
-        }),
-        this.db.subject.count({ where }),
-      ]);
+        },
+      });
 
-      return {
-        items,
-        total,
-        page: paginationDto.page,
-        limit: paginationDto.limit,
-        totalPages: Math.ceil(total / paginationDto.limit),
-      };
+      return subjects;
     } catch (error) {
       this.logError('Ошибка получения списка предметов', error as Error, {
         pagination: paginationDto,

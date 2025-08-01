@@ -5,14 +5,8 @@ import {
   UpdateRequestResponseDto,
   RequestResponseFilterDto,
 } from './dto/request-response.dto';
-import {
-  BaseService,
-  BusinessException,
-  NotFoundException,
-  PaginatedResult,
-  PaginationDto,
-} from '@common';
-import { Prisma } from '@prisma/client';
+import { BaseService, BusinessException, NotFoundException } from '@common';
+import { Prisma, RequestResponse } from '@prisma/client';
 
 @Injectable()
 export class RequestResponsesService extends BaseService {
@@ -47,10 +41,7 @@ export class RequestResponsesService extends BaseService {
     });
   }
 
-  async findAll(
-    pagination: PaginationDto,
-    filter: RequestResponseFilterDto,
-  ): Promise<PaginatedResult<any>> {
+  async findAll(filter: RequestResponseFilterDto): Promise<RequestResponse[]> {
     const where: Prisma.RequestResponseWhereInput = {};
     if (filter.tutorId) where.tutorId = filter.tutorId;
     if (filter.requestId) where.requestId = filter.requestId;
@@ -63,22 +54,11 @@ export class RequestResponsesService extends BaseService {
     if (filter.search?.trim()) {
       where.message = { contains: filter.search.trim(), mode: 'insensitive' };
     }
-    const [items, total] = await Promise.all([
-      this.db.requestResponse.findMany({
-        where,
-        skip: pagination.skip,
-        take: pagination.limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.db.requestResponse.count({ where }),
-    ]);
-    return {
-      items,
-      total,
-      page: pagination.page,
-      limit: pagination.limit,
-      totalPages: Math.ceil(total / pagination.limit),
-    };
+    const items = await this.db.requestResponse.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+    return items;
   }
 
   async findOne(id: string) {

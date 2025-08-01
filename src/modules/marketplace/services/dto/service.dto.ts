@@ -15,15 +15,6 @@ import { ServiceStatus } from '@prisma/client';
 
 export class CreateServiceDto {
   @ApiProperty({
-    description: 'ID репетитора, создающего услугу',
-    example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-  })
-  @IsString()
-  @IsNotEmpty()
-  @IsUUID()
-  tutorId: string;
-
-  @ApiProperty({
     description: 'ID предмета',
     example: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
   })

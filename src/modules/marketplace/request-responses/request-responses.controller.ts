@@ -17,7 +17,7 @@ import {
   RequestResponseResponseDto,
   RequestResponseFilterDto,
 } from './dto/request-response.dto';
-import { PaginationDto, ApiSuccessResponse, CurrentUser } from '@common';
+import { ApiSuccessResponse } from '@common';
 
 @ApiTags('Marketplace - Request Responses')
 @Controller('marketplace/request-responses')
@@ -35,11 +35,8 @@ export class RequestResponsesController {
   @Get()
   @ApiOperation({ summary: 'Список откликов' })
   @ApiSuccessResponse(RequestResponseResponseDto)
-  findAll(
-    @Query() pagination: PaginationDto,
-    @Query() filter: RequestResponseFilterDto,
-  ) {
-    return this.service.findAll(pagination, filter);
+  findAll(@Query() filter: RequestResponseFilterDto) {
+    return this.service.findAll(filter);
   }
 
   @Get(':id')

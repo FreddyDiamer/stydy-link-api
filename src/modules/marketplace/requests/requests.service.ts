@@ -133,10 +133,7 @@ export class RequestsService extends BaseService {
     }
   }
 
-  async findAll(
-    paginationDto: PaginationDto,
-    filterDto: RequestFilterDto,
-  ): Promise<PaginatedResult<Request>> {
+  async findAll(filterDto: RequestFilterDto): Promise<Request[]> {
     try {
       const where: Prisma.RequestWhereInput = {};
 
@@ -178,8 +175,6 @@ export class RequestsService extends BaseService {
       const [items, total] = await Promise.all([
         this.db.request.findMany({
           where,
-          skip: paginationDto.skip,
-          take: paginationDto.limit,
           orderBy: { createdAt: 'desc' },
           include: {
             student: {
@@ -221,16 +216,9 @@ export class RequestsService extends BaseService {
         this.db.request.count({ where }),
       ]);
 
-      return {
-        items,
-        total,
-        page: paginationDto.page,
-        limit: paginationDto.limit,
-        totalPages: Math.ceil(total / paginationDto.limit),
-      };
+      return items;
     } catch (error) {
       this.logError('Ошибка получения списка заявок', error as Error, {
-        pagination: paginationDto,
         filter: filterDto,
       });
       throw new BusinessException('Не удалось получить список заявок');

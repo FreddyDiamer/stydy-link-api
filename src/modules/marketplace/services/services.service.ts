@@ -20,15 +20,18 @@ export class ServicesService extends BaseService {
     super();
   }
 
-  async create(createServiceDto: CreateServiceDto): Promise<Service> {
+  async create(
+    createServiceDto: CreateServiceDto,
+    tutorId: string,
+  ): Promise<Service> {
     try {
       // Проверяем существование репетитора
       const tutor = await this.db.user.findUnique({
-        where: { id: createServiceDto.tutorId },
+        where: { id: tutorId },
       });
 
       if (!tutor) {
-        throw new NotFoundException('User', createServiceDto.tutorId);
+        throw new NotFoundException('User', tutorId);
       }
 
       // Проверяем существование предмета и преподавателя
@@ -71,6 +74,7 @@ export class ServicesService extends BaseService {
           deadline: createServiceDto.deadline
             ? new Date(createServiceDto.deadline)
             : undefined,
+          tutorId,
         },
         include: {
           tutor: {

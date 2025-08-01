@@ -51,7 +51,7 @@ export class TeachersService extends BaseService {
   async findAll(
     paginationDto: PaginationDto,
     filterDto: TeacherFilterDto,
-  ): Promise<PaginatedResult<Teacher>> {
+  ): Promise<Teacher[]> {
     try {
       const where: Prisma.TeacherWhereInput = {};
 
@@ -65,45 +65,36 @@ export class TeachersService extends BaseService {
 
       // TODO: Поиск по внешнему ID после обновления Prisma client
 
-      const [items, total] = await Promise.all([
-        this.db.teacher.findMany({
-          where,
-          skip: paginationDto.skip,
-          take: paginationDto.limit,
-          orderBy: { fullName: 'asc' },
-          include: {
-            teacherSubjects: {
-              where: { isActive: true },
-              include: {
-                subject: {
-                  select: {
-                    id: true,
-                    name: true,
-                    isActive: true,
-                  },
+      const teachers = await this.db.teacher.findMany({
+        where,
+        skip: paginationDto.skip,
+        take: paginationDto.limit,
+        orderBy: { fullName: 'asc' },
+        include: {
+          teacherSubjects: {
+            where: { isActive: true },
+            include: {
+              subject: {
+                select: {
+                  id: true,
+                  name: true,
+                  isActive: true,
                 },
               },
-              orderBy: { subject: { name: 'asc' } },
             },
-            _count: {
-              select: {
-                services: { where: { status: 'ACTIVE' } },
-                requests: true,
-                deals: true,
-              },
+            orderBy: { subject: { name: 'asc' } },
+          },
+          _count: {
+            select: {
+              services: { where: { status: 'ACTIVE' } },
+              requests: true,
+              deals: true,
             },
           },
-        }),
-        this.db.teacher.count({ where }),
-      ]);
+        },
+      });
 
-      return {
-        items,
-        total,
-        page: paginationDto.page,
-        limit: paginationDto.limit,
-        totalPages: Math.ceil(total / paginationDto.limit),
-      };
+      return teachers;
     } catch (error) {
       this.logError('Ошибка получения списка преподавателей', error as Error, {
         pagination: paginationDto,
