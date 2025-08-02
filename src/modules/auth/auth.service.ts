@@ -43,6 +43,9 @@ export class AuthService {
       // Ищем существующего пользователя
       let user = await this.db.user.findUnique({
         where: { telegramId },
+        include: {
+          group: true,
+        },
       });
 
       if (user) {
@@ -55,6 +58,9 @@ export class AuthService {
               name,
               lastActivity: new Date(),
             },
+            include: {
+              group: true,
+            },
           });
         }
       } else {
@@ -65,6 +71,9 @@ export class AuthService {
             telegramUsername,
             name,
           },
+          include: {
+            group: true,
+          },
         });
       }
 
@@ -73,11 +82,7 @@ export class AuthService {
 
       return {
         accessToken,
-        user: {
-          id: user.id,
-          telegramUsername: user.telegramUsername,
-          name: user.name,
-        },
+        user,
       };
     } catch (error) {
       if (error instanceof BusinessException) {
