@@ -104,6 +104,7 @@ export class UsersService extends BaseService {
     const user = await this.db.user.findUnique({
       where: { id },
       include: {
+        group: true,
         services: {
           where: { status: 'ACTIVE' },
           include: { subject: true, teacher: true },
@@ -194,6 +195,44 @@ export class UsersService extends BaseService {
 
   async unverify(id: string): Promise<User> {
     return this.update(id, { isVerified: false });
+  }
+
+  async updateGroup(id: string, groupId?: string): Promise<User> {
+    try {
+      // Проверяем существование пользователя
+      await this.findOne(id);
+
+      // Если указана группа, проверяем её существование
+      if (groupId) {
+        const group = await this.db.group.findUnique({
+          where: { id: groupId },
+        });
+
+        if (!group) {
+          throw new NotFoundException(`Group with ID ${groupId} not found`);
+        }
+      }
+
+      const user = await this.db.user.update({
+        where: { id },
+        data: { groupId },
+        include: {
+          group: true,
+        },
+      });
+
+      this.logInfo(`User group updated: ${id}`, { groupId });
+      return user;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logError('Failed to update user group', error as Error, {
+        id,
+        groupId,
+      });
+      throw new BusinessException('Failed to update user group');
+    }
   }
 
   async remove(id: string): Promise<void> {

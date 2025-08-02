@@ -179,6 +179,19 @@ export class UsersController {
     return this.usersService.activate(id);
   }
 
+  @Patch(':id/group')
+  @ApiOperation({
+    summary: 'Обновить группу пользователя',
+    description: 'Изменить группу пользователя',
+  })
+  @ApiSuccessResponse(UserResponseDto)
+  async updateGroup(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { groupId?: string },
+  ) {
+    return this.usersService.updateGroup(id, body.groupId);
+  }
+
   @Delete(':id')
   @ApiOperation({
     summary: 'Удалить пользователя',

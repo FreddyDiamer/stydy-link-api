@@ -74,6 +74,14 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsNumber()
   @Min(0)
   balance?: number;
+
+  @ApiPropertyOptional({
+    description: 'User group ID',
+    example: 'uuid-here',
+  })
+  @IsOptional()
+  @IsString()
+  groupId?: string;
 }
 
 export class UserFilterDto {
@@ -150,6 +158,15 @@ export class UserResponseDto {
 
   @ApiProperty()
   isActive: boolean;
+
+  @ApiPropertyOptional()
+  groupId?: string;
+
+  @ApiPropertyOptional()
+  group?: {
+    id: string;
+    number: string;
+  };
 
   @ApiProperty()
   lastActivity: Date;
