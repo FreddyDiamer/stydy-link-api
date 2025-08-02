@@ -61,8 +61,8 @@ model User {
   
   // Profile fields
   name             String
-  firstName        String?
   description      String?   // био/описание профиля
+  groupId          String?
   avatarUrl        String?   // ссылка на фото профиля
   
   // System fields
@@ -78,6 +78,7 @@ model User {
   
   // Как студент  
   requests         Request[]
+  group            Group?    @relation(fields: [groupId], references: [id])
   
   // Отзывы
   reviewsGiven     Review[]  @relation("ReviewAuthor")
@@ -111,6 +112,7 @@ model Subject {
   services        Service[]
   requests        Request[]
   deals           Deal[]
+  groupSubjects   GroupSubject[]
   
   @@map("subjects")
 }
@@ -132,6 +134,18 @@ model Teacher {
   @@map("teachers")
 }
 
+model Group {
+  id String @id @default(uuid())
+  number String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  students User[]
+  groupSubjects GroupSubject[]
+  
+  @@map("groups")
+}
+
 model TeacherSubject {
   id        String @id @default(uuid())
   teacherId String
@@ -147,6 +161,21 @@ model TeacherSubject {
   
   @@unique([teacherId, subjectId])
   @@map("teacher_subjects")
+}
+
+model GroupSubject {
+  id String @id @default(uuid())
+  groupId String
+  subjectId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Связи
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, subjectId])
+  @@map("group_subjects")
 }
 
 // =============================================================================
