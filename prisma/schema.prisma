@@ -31,18 +31,18 @@ enum Urgency {
 }
 
 enum DealStatus {
-  PENDING     // ожидает подтверждения
-  ACCEPTED    // принята
+  PENDING // ожидает подтверждения
+  ACCEPTED // принята
   IN_PROGRESS // в процессе
-  COMPLETED   // завершена
-  CANCELLED   // отменена
+  COMPLETED // завершена
+  CANCELLED // отменена
 }
 
 enum ResponseStatus {
-  PENDING   // ожидает ответа
-  ACCEPTED  // принят
-  REJECTED  // отклонен
-  EXPIRED   // истек срок
+  PENDING // ожидает ответа
+  ACCEPTED // принят
+  REJECTED // отклонен
+  EXPIRED // истек срок
 }
 
 enum UserRole {
@@ -55,43 +55,43 @@ enum UserRole {
 // =============================================================================
 
 model User {
-  id               String    @id @default(uuid())
-  telegramUsername String    @unique
-  telegramId       String    @unique
-  
+  id               String @id @default(uuid())
+  telegramUsername String @unique
+  telegramId       String @unique
+
   // Profile fields
-  name             String
-  description      String?   // био/описание профиля
-  groupId          String?
-  avatarUrl        String?   // ссылка на фото профиля
-  
+  name        String
+  description String? // био/описание профиля
+  groupId     String?
+  avatarUrl   String? // ссылка на фото профиля
+
   // System fields
-  balance          Int       @default(0) // в копейках
-  lastActivity     DateTime  @default(now())
-  
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  
+  balance      Int      @default(0) // в копейках
+  lastActivity DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Связи
   // Как репетитор
-  services         Service[]
-  
+  services Service[]
+
   // Как студент  
-  requests         Request[]
-  group            Group?    @relation(fields: [groupId], references: [id])
-  
+  requests Request[]
+  group    Group?    @relation(fields: [groupId], references: [id])
+
   // Отзывы
-  reviewsGiven     Review[]  @relation("ReviewAuthor")
-  reviewsReceived  Review[]  @relation("ReviewTarget")
-  
+  reviewsGiven    Review[] @relation("ReviewAuthor")
+  reviewsReceived Review[] @relation("ReviewTarget")
+
   // Отклики
   serviceResponses ServiceResponse[] @relation("StudentServiceResponses")
   requestResponses RequestResponse[] @relation("TutorRequestResponses")
-  
+
   // Как участник сделок
-  studentDeals     Deal[]    @relation("StudentDeals")
-  tutorDeals       Deal[]    @relation("TutorDeals")
-  
+  studentDeals Deal[] @relation("StudentDeals")
+  tutorDeals   Deal[] @relation("TutorDeals")
+
   @@map("users")
 }
 
@@ -100,72 +100,74 @@ model User {
 // =============================================================================
 
 model Subject {
-  id          String    @id @default(uuid())
-  name        String    @unique // "Математика", "Физика"
-  isActive    Boolean   @default(true)
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
+  id       String  @id @default(uuid())
+  name     String  @unique // "Математика", "Физика"
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Связи
   teacherSubjects TeacherSubject[]
   services        Service[]
   requests        Request[]
   deals           Deal[]
   groupSubjects   GroupSubject[]
-  
+
   @@map("subjects")
 }
 
 model Teacher {
-  id       String  @id @default(uuid())
-  fullName String  // "Иванов Иван Иванович"
+  id        String @id @default(uuid())
+  fullName  String // "Иванов Иван Иванович"
   foreignId String
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Связи
   teacherSubjects TeacherSubject[]
   services        Service[]
   requests        Request[]
   deals           Deal[]
-  
+
   @@map("teachers")
 }
 
 model Group {
-  id String @id @default(uuid())
-  number String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(uuid())
+  foreignId     String
+  number        String
+  educationForm String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  students User[]
+  students      User[]
   groupSubjects GroupSubject[]
-  
+
   @@map("groups")
 }
 
 model TeacherSubject {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   teacherId String
   subjectId String
   isActive  Boolean @default(true)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Связи
-  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
   @@unique([teacherId, subjectId])
   @@map("teacher_subjects")
 }
 
 model GroupSubject {
-  id String @id @default(uuid())
-  groupId String
+  id        String   @id @default(uuid())
+  groupId   String
   subjectId String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -187,49 +189,49 @@ model Service {
   tutorId     String
   subjectId   String
   teacherId   String
-  price       Int           // в копейках
+  price       Int // в копейках
   description String?
   status      ServiceStatus @default(ACTIVE)
-  
+
   // Срок выполнения (для услуг с временными рамками)
   deadline DateTime?
-  
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Связи
-  tutor       User          @relation(fields: [tutorId], references: [id], onDelete: Cascade)
-  subject     Subject       @relation(fields: [subjectId], references: [id])
-  teacher     Teacher       @relation(fields: [teacherId], references: [id])
-  
+  tutor   User    @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+
   // Отклики на услугу (через них создаются сделки)
-  responses   ServiceResponse[]
-  
+  responses ServiceResponse[]
+
   @@map("services")
 }
 
 model Request {
-  id          String        @id @default(uuid())
+  id          String  @id @default(uuid())
   studentId   String
   subjectId   String
   teacherId   String
   description String?
-  budget      Int?          // в копейках, максимальная цена
-  
+  budget      Int? // в копейках, максимальная цена
+
   // Срок выполнения
   deadline DateTime?
-  
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Связи
-  student     User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  subject     Subject       @relation(fields: [subjectId], references: [id])
-  teacher     Teacher       @relation(fields: [teacherId], references: [id])
-  
+  student User    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+
   // Отклики на заявку (через них создаются сделки)
-  responses   RequestResponse[]
-  
+  responses RequestResponse[]
+
   @@map("requests")
 }
 
@@ -239,71 +241,71 @@ model Deal {
   tutorId   String
   subjectId String
   teacherId String
-  price     Int        // в копейках, согласованная цена
-  deadline  DateTime?  // согласованная дата выполнения
+  price     Int // в копейках, согласованная цена
+  deadline  DateTime? // согласованная дата выполнения
   status    DealStatus @default(PENDING)
-  
+
   // Deal создается только из принятого отклика
   serviceResponseId String? @unique
   requestResponseId String? @unique
-  
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Связи
-  student   User       @relation("StudentDeals", fields: [studentId], references: [id], onDelete: Cascade)
-  tutor     User       @relation("TutorDeals", fields: [tutorId], references: [id], onDelete: Cascade)
-  subject   Subject    @relation(fields: [subjectId], references: [id])
-  teacher   Teacher    @relation(fields: [teacherId], references: [id])
-  
+  student User    @relation("StudentDeals", fields: [studentId], references: [id], onDelete: Cascade)
+  tutor   User    @relation("TutorDeals", fields: [tutorId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+
   // Отклики, из которых создана сделка
   serviceResponse ServiceResponse? @relation("ServiceResponseDeal", fields: [serviceResponseId], references: [id])
   requestResponse RequestResponse? @relation("RequestResponseDeal", fields: [requestResponseId], references: [id])
-  
+
   // Отзыв по сделке
-  review    Review?
-  
+  review Review?
+
   @@map("deals")
 }
 
 model ServiceResponse {
-  id        String         @id @default(uuid())
-  studentId String         // студент откликается на услугу
-  serviceId String
-  message   String?        // сообщение при отклике
-  price     Int?           // предложенная цена студента
+  id               String         @id @default(uuid())
+  studentId        String // студент откликается на услугу
+  serviceId        String
+  message          String? // сообщение при отклике
+  price            Int? // предложенная цена студента
   proposedDeadline DateTime? // предложенная дата выполнения
-  status    ResponseStatus @default(PENDING)
-  
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  
+  status           ResponseStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Связи
-  student   User           @relation("StudentServiceResponses", fields: [studentId], references: [id], onDelete: Cascade)
-  service   Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  deal      Deal?          @relation("ServiceResponseDeal")
-  
+  student User    @relation("StudentServiceResponses", fields: [studentId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  deal    Deal?   @relation("ServiceResponseDeal")
+
   @@unique([studentId, serviceId])
   @@map("service_responses")
 }
 
 model RequestResponse {
-  id        String         @id @default(uuid())
-  tutorId   String         // репетитор откликается на заявку
-  requestId String
-  message   String?        // сообщение при отклике
-  price     Int?           // предложенная цена репетитора
+  id               String         @id @default(uuid())
+  tutorId          String // репетитор откликается на заявку
+  requestId        String
+  message          String? // сообщение при отклике
+  price            Int? // предложенная цена репетитора
   proposedDeadline DateTime? // предложенная дата выполнения
-  status    ResponseStatus @default(PENDING)
-  
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  
+  status           ResponseStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Связи
-  tutor     User           @relation("TutorRequestResponses", fields: [tutorId], references: [id], onDelete: Cascade)
-  request   Request        @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  deal      Deal?          @relation("RequestResponseDeal")
-  
+  tutor   User    @relation("TutorRequestResponses", fields: [tutorId], references: [id], onDelete: Cascade)
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  deal    Deal?   @relation("RequestResponseDeal")
+
   @@unique([tutorId, requestId])
   @@map("request_responses")
 }
@@ -313,23 +315,23 @@ model RequestResponse {
 // =============================================================================
 
 model Review {
-  id       String @id @default(uuid())
-  dealId   String @unique
+  id       String  @id @default(uuid())
+  dealId   String  @unique
   authorId String // кто оставил отзыв
   targetId String // кому оставлен отзыв
-  rating   Int    // 1-5
+  rating   Int // 1-5
   comment  String?
-  
+
   // Роль цели отзыва (для правильного обновления статистики)
   targetRole UserRole // TUTOR или STUDENT 
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Связи
-  deal     Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  author   User @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  target   User @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Cascade)
-  
+  deal   Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  author User @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  target User @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
   @@map("reviews")
 }

@@ -12,14 +12,24 @@ export class GroupsService extends BaseService {
 
   async create(createGroupDto: CreateGroupDto): Promise<Group> {
     try {
-      // Проверяем уникальность номера группы
+      // Проверяем уникальность номера группы и foreignId
       const existingGroup = await this.db.group.findFirst({
-        where: { number: createGroupDto.number },
+        where: {
+          OR: [
+            { number: createGroupDto.number },
+            { foreignId: createGroupDto.foreignId },
+          ],
+        },
       });
 
       if (existingGroup) {
+        if (existingGroup.number === createGroupDto.number) {
+          throw new BusinessException(
+            `Group with number ${createGroupDto.number} already exists`,
+          );
+        }
         throw new BusinessException(
-          `Group with number ${createGroupDto.number} already exists`,
+          `Group with foreignId ${createGroupDto.foreignId} already exists`,
         );
       }
 
