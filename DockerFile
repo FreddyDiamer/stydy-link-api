@@ -1,0 +1,53 @@
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Копируем файлы зависимостей
+COPY package*.json ./
+COPY pnpm-lock.yaml ./
+
+RUN npm install -g pnpm
+
+# Устанавливаем зависимости
+RUN pnpm install --frozen-lockfile
+
+# Копируем исходный код и конфигурацию
+COPY src ./src
+COPY prisma ./prisma
+COPY tsconfig*.json ./
+COPY nest-cli.json ./
+
+# Генерируем Prisma клиент
+RUN npx prisma generate
+
+# Собираем приложение
+RUN pnpm run build
+
+
+FROM node:18-alpine AS production
+
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+# Копируем файлы зависимостей
+COPY package*.json ./
+COPY pnpm-lock.yaml ./
+
+# Устанавливаем только production зависимости
+RUN pnpm install --frozen-lockfile --prod && pnpm store prune
+
+# Копируем собранное приложение и необходимые файлы
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+
+RUN npx prisma generate
+
+EXPOSE 3000
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Запускаем миграции и приложение
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+
