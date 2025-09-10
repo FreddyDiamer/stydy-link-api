@@ -1,0 +1,11 @@
+echo "🔍 Running pre-commit checks..."
+
+npx lint-staged
+
+echo "🔧 Checking TypeScript compilation..."
+npx tsc --noEmit
+
+echo "🗄️  Validating Prisma schema..."
+npx prisma validate
+
+echo "✅ Pre-commit checks completed!"
