@@ -1,5 +1,6 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { JsonObject } from '@prisma/client/runtime/library';
 
 export class CreateGroupDto {
   @ApiProperty({
@@ -20,11 +21,14 @@ export class CreateGroupDto {
 
   @ApiProperty({
     description: 'Форма обучения',
-    example: 'очная',
+    example: {
+      educationForm: 'очная',
+    },
+    required: false,
   })
-  @IsString()
-  @IsNotEmpty()
-  educationForm: string;
+  @IsOptional()
+  @IsObject()
+  data: JsonObject;
 }
 
 export class GroupResponseDto {
@@ -38,7 +42,7 @@ export class GroupResponseDto {
   number: string;
 
   @ApiProperty()
-  educationForm: string;
+  data: JsonObject;
 
   @ApiProperty()
   createdAt: string;

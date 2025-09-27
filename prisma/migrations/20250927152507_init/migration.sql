@@ -57,7 +57,7 @@ CREATE TABLE "groups" (
     "id" TEXT NOT NULL,
     "foreignId" TEXT NOT NULL,
     "number" TEXT NOT NULL,
-    "educationForm" TEXT NOT NULL,
+    "data" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

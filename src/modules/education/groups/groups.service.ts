@@ -20,11 +20,6 @@ export class GroupsService extends BaseService {
       });
 
       if (existingGroup) {
-        if (existingGroup.number === createGroupDto.number) {
-          throw new BusinessException(
-            `Group with number ${createGroupDto.number} already exists`,
-          );
-        }
         throw new BusinessException(
           `Group with foreignId ${createGroupDto.foreignId} already exists`,
         );
