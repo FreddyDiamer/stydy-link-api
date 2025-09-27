@@ -15,10 +15,7 @@ export class GroupsService extends BaseService {
       // Проверяем уникальность номера группы и foreignId
       const existingGroup = await this.db.group.findFirst({
         where: {
-          OR: [
-            { number: createGroupDto.number },
-            { foreignId: createGroupDto.foreignId },
-          ],
+          foreignId: createGroupDto.foreignId,
         },
       });
 
