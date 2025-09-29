@@ -177,3 +177,13 @@ export class UserResponseDto {
   @ApiProperty()
   updatedAt: Date;
 }
+
+export class UpdateGroupDto {
+  @ApiProperty({
+    description: 'Group ID',
+    example: 'uuid-here',
+  })
+  @IsString()
+  @IsNotEmpty()
+  groupId: string;
+}

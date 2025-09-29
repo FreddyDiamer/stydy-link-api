@@ -23,6 +23,7 @@ import {
   UpdateUserDto,
   UserResponseDto,
   UserFilterDto,
+  UpdateGroupDto,
 } from './dto/user.dto';
 import { PaginationDto, CurrentUser, ApiSuccessResponse } from '@common';
 
@@ -126,6 +127,16 @@ export class UsersController {
     return this.usersService.update(user.id, allowedUpdates);
   }
 
+  @Patch('group')
+  @ApiOperation({
+    summary: 'Обновить группу пользователя',
+    description: 'Изменить группу пользователя',
+  })
+  @ApiSuccessResponse(UserResponseDto)
+  async updateGroup(@CurrentUser() user: User, @Body() body: UpdateGroupDto) {
+    return this.usersService.updateGroup(user.id, body.groupId);
+  }
+
   @Patch(':id')
   @ApiOperation({
     summary: 'Обновить пользователя',
@@ -177,19 +188,6 @@ export class UsersController {
   @ApiSuccessResponse(UserResponseDto)
   async activate(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.activate(id);
-  }
-
-  @Patch(':id/group')
-  @ApiOperation({
-    summary: 'Обновить группу пользователя',
-    description: 'Изменить группу пользователя',
-  })
-  @ApiSuccessResponse(UserResponseDto)
-  async updateGroup(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { groupId?: string },
-  ) {
-    return this.usersService.updateGroup(id, body.groupId);
   }
 
   @Delete(':id')
