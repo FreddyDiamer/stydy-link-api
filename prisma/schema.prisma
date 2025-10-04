@@ -113,6 +113,7 @@ model Subject {
   deals           Deal[]
   groupSubjects   GroupSubject[]
 
+  @@unique([name])
   @@map("subjects")
 }
 

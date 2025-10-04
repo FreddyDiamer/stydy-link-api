@@ -9,56 +9,127 @@ export class SyncService extends BaseService {
     super();
   }
 
-  /**
-   * Синхронизация преподавателей с БД
-   */
-  async syncTeachers(teachers: ParsedTeacherDto[]): Promise<void> {
+  async syncTeachers(teachers: ParsedTeacherDto[]): Promise<number> {
+    if (teachers.length === 0) return 0;
+
     try {
-      for (const teacher of teachers) {
-        await this.db.teacher.upsert({
-          where: { foreignId: teacher.id },
-          update: {
-            fullName: teacher.lecturer,
-            data: JSON.stringify(teacher), // Сохраняем все данные из API
-            updatedAt: new Date(),
-          },
-          create: {
-            fullName: teacher.lecturer,
-            foreignId: teacher.id,
-            data: JSON.stringify(teacher),
-          },
-        });
-      }
+      return await this.retry(
+        async () => {
+          return await this.db.$transaction(
+            async (tx) => {
+              return await this.syncTeachersInTx(tx, teachers);
+            },
+            {
+              maxWait: 5000,
+              timeout: 30000,
+            },
+          );
+        },
+        { maxAttempts: 2, delay: 1000 },
+      );
     } catch (error) {
-      this.logError('Ошибка при синхронизации преподавателей', error as Error);
+      const err = this.normalizeError(error);
+      this.logError(
+        `Ошибка при синхронизации ${teachers.length} преподавателей`,
+        err,
+      );
       throw new BusinessException('Не удалось синхронизировать преподавателей');
     }
   }
 
-  /**
-   * Синхронизация групп с БД
-   */
-  async syncGroups(groups: ParsedGroupDto[]): Promise<void> {
+  async syncGroups(groups: ParsedGroupDto[]): Promise<number> {
+    if (groups.length === 0) return 0;
+
     try {
-      for (const group of groups) {
-        await this.db.group.upsert({
-          where: { foreignId: group.id.toString() },
-          update: {
-            number: group.group,
-            data: JSON.stringify(group),
-            updatedAt: new Date(),
-          },
-          create: {
-            number: group.group,
-            foreignId: group.id.toString(),
-            data: JSON.stringify(group),
-          },
-        });
-      }
+      return await this.retry(
+        async () => {
+          return await this.db.$transaction(
+            async (tx) => {
+              return await this.syncGroupsInTx(tx, groups);
+            },
+            {
+              maxWait: 5000,
+              timeout: 30000,
+            },
+          );
+        },
+        { maxAttempts: 2, delay: 1000 },
+      );
     } catch (error) {
-      this.logError('Ошибка при синхронизации групп', error as Error);
+      const err = this.normalizeError(error);
+      this.logError(`Ошибка при синхронизации ${groups.length} групп`, err);
       throw new BusinessException('Не удалось синхронизировать группы');
     }
+  }
+
+  private async syncTeachersInTx(
+    tx: any,
+    teachers: ParsedTeacherDto[],
+  ): Promise<number> {
+    let syncedCount = 0;
+    const chunkSize = 100;
+
+    for (let i = 0; i < teachers.length; i += chunkSize) {
+      const chunk = teachers.slice(i, i + chunkSize);
+
+      await Promise.all(
+        chunk.map((teacher) =>
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+          tx.teacher.upsert({
+            where: { foreignId: teacher.id },
+            update: {
+              fullName: teacher.lecturer,
+              data: JSON.stringify(teacher),
+              updatedAt: new Date(),
+            },
+            create: {
+              fullName: teacher.lecturer,
+              foreignId: teacher.id,
+              data: JSON.stringify(teacher),
+            },
+          }),
+        ),
+      );
+
+      syncedCount += chunk.length;
+    }
+
+    return syncedCount;
+  }
+
+  private async syncGroupsInTx(
+    tx: any,
+    groups: ParsedGroupDto[],
+  ): Promise<number> {
+    let syncedCount = 0;
+    const chunkSize = 100;
+
+    for (let i = 0; i < groups.length; i += chunkSize) {
+      const chunk = groups.slice(i, i + chunkSize);
+
+      await Promise.all(
+        chunk.map((group) =>
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          tx.group.upsert({
+            where: { foreignId: group.id.toString() },
+            update: {
+              number: group.group,
+              data: JSON.stringify(group),
+              updatedAt: new Date(),
+            },
+            create: {
+              number: group.group,
+              foreignId: group.id.toString(),
+              data: JSON.stringify(group),
+            },
+          }),
+        ),
+      );
+
+      syncedCount += chunk.length;
+    }
+
+    return syncedCount;
   }
 
   // /**

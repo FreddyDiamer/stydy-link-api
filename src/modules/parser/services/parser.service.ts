@@ -9,32 +9,25 @@ import { SyncService } from './sync.service';
 @Injectable()
 export class ParserService extends BaseService {
   private result: ParseResultDto;
+  private readonly CONCURRENCY_LIMIT = 5;
 
   constructor(private readonly syncService: SyncService) {
     super();
   }
+
   async parseAndSync(): Promise<ParseResultDto> {
     this.initializeResult();
 
     try {
-      // Парсим данные
+      this.logInfo('🚀 Запуск парсинга и синхронизации');
+
       await Promise.all([this.processTeachers(), this.processGroups()]);
+
       this.completeResult();
-      // const subjects = await this.parseSubjects(teachers, groups);
-
-      // Синхронизируем с БД
-      // await this.syncService.syncTeachers(teachers);
-      // await this.syncService.syncGroups(groups);
-      // await this.syncService.syncSubjects(subjects);
-      // await this.syncService.syncRelations(teachers, groups, subjects);
-
-      // result.teachersProcessed = teachers.length;
-      // result.groupsProcessed = groups.length;
-      // result.subjectsProcessed = subjects.length;
-      // result.status = ParseStatus.COMPLETED;
-      // result.endTime = new Date();
-
-      this.logInfo('Синхронизация завершена успешно', this.result);
+      this.logSuccess(
+        `Синхронизация завершена: ${this.result.teachersProcessed} преподавателей, ` +
+          `${this.result.groupsProcessed} групп за ${this.result.duration} сек`,
+      );
 
       return this.result;
     } catch (error) {
@@ -42,33 +35,101 @@ export class ParserService extends BaseService {
       throw error;
     }
   }
+
   async processGroups(): Promise<void> {
     const numbers = '1234567890';
+    const queries = numbers.split('');
 
-    await Promise.all(
-      numbers.split('').map(async (number) => {
-        const groups: ParsedGroupDto[] = await this.getGroups(number);
-        if (groups.length === 0) {
-          return;
+    this.logInfo(`📚 Начало парсинга групп по ${queries.length} запросам`);
+
+    await this.processBatch(
+      queries,
+      async (number) => {
+        try {
+          const groups = await this.retry(() => this.getGroups(number), {
+            maxAttempts: 3,
+            delay: 500,
+          });
+
+          if (groups.length === 0) {
+            return 0;
+          }
+
+          const synced = await this.syncService.syncGroups(groups);
+          this.logInfo(
+            `✓ Группы на "${number}": парсировано ${groups.length}, синхронизировано ${synced}`,
+          );
+          return synced;
+        } catch (error) {
+          const err = this.normalizeError(error);
+          this.logError(`Ошибка обработки групп "${number}"`, err);
+          this.incrementErrorCount(err.message);
+          return 0;
         }
-        await this.syncService.syncGroups(groups);
-        this.result.groupsProcessed += groups.length;
-      }),
+      },
+      (count) => {
+        this.result.groupsProcessed += count;
+      },
+    );
+
+    this.logSuccess(
+      `Парсинг групп завершен: ${this.result.groupsProcessed} записей`,
     );
   }
 
   async processTeachers(): Promise<void> {
     const alphabets = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
-    await Promise.all(
-      alphabets.split('').map(async (letter) => {
-        const teachers: ParsedTeacherDto[] = await this.getTeachers(letter);
-        if (teachers.length === 0) {
-          return;
-        }
-        await this.syncService.syncTeachers(teachers);
-        this.result.teachersProcessed += teachers.length;
-      }),
+    const queries = alphabets.split('');
+
+    this.logInfo(
+      `👨‍🏫 Начало парсинга преподавателей по ${queries.length} запросам`,
     );
+
+    await this.processBatch(
+      queries,
+      async (letter) => {
+        try {
+          const teachers = await this.retry(() => this.getTeachers(letter), {
+            maxAttempts: 3,
+            delay: 500,
+          });
+
+          if (teachers.length === 0) {
+            return 0;
+          }
+
+          const synced = await this.syncService.syncTeachers(teachers);
+          this.logInfo(
+            `✓ Преподаватели на "${letter}": парсировано ${teachers.length}, синхронизировано ${synced}`,
+          );
+          return synced;
+        } catch (error) {
+          const err = this.normalizeError(error);
+          this.logError(`Ошибка обработки преподавателей "${letter}"`, err);
+          this.incrementErrorCount(err.message);
+          return 0;
+        }
+      },
+      (count) => {
+        this.result.teachersProcessed += count;
+      },
+    );
+
+    this.logSuccess(
+      `Парсинг преподавателей завершен: ${this.result.teachersProcessed} записей`,
+    );
+  }
+
+  private async processBatch<T, R>(
+    items: T[],
+    processor: (item: T) => Promise<R>,
+    onResult: (result: R) => void,
+  ): Promise<void> {
+    for (let i = 0; i < items.length; i += this.CONCURRENCY_LIMIT) {
+      const batch = items.slice(i, i + this.CONCURRENCY_LIMIT);
+      const batchResults = await Promise.all(batch.map(processor));
+      batchResults.forEach(onResult);
+    }
   }
 
   async getTeachers(query: string = ''): Promise<ParsedTeacherDto[]> {
@@ -92,16 +153,23 @@ export class ParserService extends BaseService {
         timeout: 30000,
       });
 
+      if (!Array.isArray(response.data)) {
+        this.logWarn(
+          `Неожиданный формат данных для запроса "${query}": ${typeof response.data}`,
+        );
+        return [];
+      }
+
       return response.data as ParsedTeacherDto[];
     } catch (error) {
-      this.logError('Ошибка при получении преподавателей:', error as Error);
-      return [];
+      const err = this.normalizeError(error);
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return [];
+      }
+      throw err;
     }
   }
 
-  /**
-   * Парсинг групп с сайта университета
-   */
   async getGroups(query: string = ''): Promise<ParsedGroupDto[]> {
     const url = 'https://kai.ru/web/studentu/raspisanie1';
 
@@ -114,24 +182,29 @@ export class ParserService extends BaseService {
 
     try {
       const response = await axios.get(`${url}?${params}`, {
-        method: 'GET',
         headers: {
           Accept: 'application/json, text/javascript, */*; q=0.01',
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           Referer: 'https://kai.ru/web/studentu/raspisanie1',
         },
+        timeout: 30000,
       });
 
-      if (response.status !== 200) {
-        throw new Error(`HTTP error! status: ${response.statusText}`);
+      if (!Array.isArray(response.data)) {
+        this.logWarn(
+          `Неожиданный формат данных для запроса "${query}": ${typeof response.data}`,
+        );
+        return [];
       }
 
-      const data = response.data as ParsedGroupDto[];
-      return data;
+      return response.data as ParsedGroupDto[];
     } catch (error) {
-      this.logError('Ошибка при получении групп:', error as Error);
-      return [];
+      const err = this.normalizeError(error);
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return [];
+      }
+      throw err;
     }
   }
 
@@ -234,6 +307,9 @@ export class ParserService extends BaseService {
   //   ];
   // }
 
+  /**
+   * Инициализация результата
+   */
   private initializeResult(): void {
     this.result = {
       startTime: new Date(),
@@ -255,14 +331,19 @@ export class ParserService extends BaseService {
   }
 
   private handleError(error: unknown): void {
+    const err = this.normalizeError(error);
     this.result.status = ParseStatus.FAILED;
     this.result.endTime = new Date();
     this.result.duration = this.calculateDuration();
+    this.incrementErrorCount(err.message);
+    this.logError('❌ Фатальная ошибка при парсинге и синхронизации', err);
+  }
+
+  private incrementErrorCount(errorMessage: string): void {
     this.result.errorCount += 1;
-    this.result.errors.push(
-      error instanceof Error ? error.message : String(error),
-    );
-    this.logError('Ошибка при парсинге и синхронизации', error as Error);
+    if (!this.result.errors.includes(errorMessage)) {
+      this.result.errors.push(errorMessage);
+    }
   }
 
   private calculateDuration(): number {
