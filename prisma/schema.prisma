@@ -100,10 +100,9 @@ model User {
 // =============================================================================
 
 model Subject {
-  id       String  @id @default(uuid())
-  name     String  @unique // "Математика", "Физика"
-  isActive Boolean @default(true)
-
+  id        String   @id @default(uuid())
+  name      String // "Математика", "Физика"
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -120,7 +119,8 @@ model Subject {
 model Teacher {
   id        String @id @default(uuid())
   fullName  String // "Иванов Иван Иванович"
-  foreignId String
+  foreignId String // ID из внешней системы университета
+  data      Json? // Дополнительные данные специфичные для университета
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -131,20 +131,23 @@ model Teacher {
   requests        Request[]
   deals           Deal[]
 
+  @@unique([foreignId]) // foreignId должен быть уникальным
   @@map("teachers")
 }
 
 model Group {
-  id            String   @id @default(uuid())
-  foreignId     String
-  number        String
-  data          Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String @id @default(uuid())
+  number    String // Номер группы: "4312", "ИВТ-21-1"
+  foreignId String // ID из внешней системы университета
+  data      Json? // Дополнительные данные (форма обучения, факультет и т.д.)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   students      User[]
   groupSubjects GroupSubject[]
 
+  @@unique([foreignId]) // foreignId должен быть уникальным
   @@map("groups")
 }
 
