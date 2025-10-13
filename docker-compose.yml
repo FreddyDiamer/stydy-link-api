@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,10 +28,11 @@ services:
       target: production
     container_name: kai-repetitor-api
     ports:
-      - '3000:3000'
+      - '${PORT:-3000}:${PORT:-3000}'
     environment:
-      - NODE_ENV=production
-      - PORT=3000
+      - NODE_ENV=${NODE_ENV:-production}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - PORT=${PORT:-3000}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-kai_repetitor}
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-dummy-token-for-development}
