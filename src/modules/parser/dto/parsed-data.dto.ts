@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsArray, IsNotEmpty, IsNumber } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber } from 'class-validator';
 
 /**
  * DTO для данных преподавателя из парсинга
  */
-export class ParsedTeacherDto {
+export class TeacherDto {
   @ApiProperty({
     description: 'Полное имя преподавателя',
     example: 'Иванов Иван Иванович',
@@ -25,7 +25,7 @@ export class ParsedTeacherDto {
 /**
  * DTO для данных группы из парсинга
  */
-export class ParsedGroupDto {
+export class GroupDto {
   @ApiProperty({
     description: 'Номер группы',
     example: '4312',
@@ -51,33 +51,12 @@ export class ParsedGroupDto {
   forma: string;
 }
 
-/**
- * DTO для данных предмета из парсинга
- */
-export class ParsedSubjectDto {
-  @ApiProperty({
-    description: 'Название предмета',
-    example: 'Математика',
-  })
+export class ScheduleLessonDto {
+  @ApiProperty({ description: 'Название дисциплины', example: 'Математика' })
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  disciplName: string;
 
-  @ApiProperty({
-    description: 'Список внешних ID преподавателей',
-    example: ['TEACHER_001', 'TEACHER_002'],
-    type: [String],
-  })
-  @IsArray()
-  @IsString({ each: true })
-  teacherIds: string[];
-
-  @ApiProperty({
-    description: 'Список внешних ID групп',
-    example: ['GROUP_4312', 'GROUP_4313'],
-    type: [String],
-  })
-  @IsArray()
-  @IsString({ each: true })
-  groupIds: string[];
+  @ApiProperty({ description: 'Логин преподавателя', example: 'IvanovII' })
+  @IsString()
+  prepodLogin: string;
 }

@@ -1,15 +1,37 @@
 import { Injectable } from '@nestjs/common';
 import { BaseService } from '@common';
-import axios from 'axios';
 
-import { ParsedGroupDto, ParsedTeacherDto } from '../dto/parsed-data.dto';
+import {
+  GroupDto,
+  TeacherDto,
+  ScheduleLessonDto,
+} from '../dto/parsed-data.dto';
 import { ParseResultDto, ParseStatus } from '../dto/parser-response.dto';
 import { SyncService } from './sync.service';
 
 @Injectable()
 export class ParserService extends BaseService {
   private result: ParseResultDto;
-  private readonly CONCURRENCY_LIMIT = 5;
+
+  private readonly config = {
+    // count of parallel requests
+    concurrency: {
+      limit: 5,
+    },
+    // delay between batches
+    rateLimit: {
+      delayBetweenBatches: 0,
+    },
+    // retry settings
+    retry: {
+      maxAttempts: 3,
+      delay: 500,
+    },
+    // request timeout
+    timeout: {
+      request: 30000,
+    },
+  };
 
   constructor(private readonly syncService: SyncService) {
     super();
@@ -23,6 +45,7 @@ export class ParserService extends BaseService {
 
       await Promise.all([this.processTeachers(), this.processGroups()]);
 
+      await this.processRelations();
       this.completeResult();
       this.logSuccess(
         `Синхронизация завершена: ${this.result.teachersProcessed} преподавателей, ` +
@@ -34,6 +57,77 @@ export class ParserService extends BaseService {
       this.handleError(error);
       throw error;
     }
+  }
+  async processRelations(): Promise<void> {
+    const [teachers, groups] = await Promise.all([
+      this.syncService.getAllTeachers(),
+      this.syncService.getAllGroups(),
+    ]);
+
+    const teacherCache = new Map(teachers.map((t) => [t.foreignId, t]));
+    const allSubjects = new Set<string>();
+    const allRelations: Map<
+      string,
+      { teacherId: string; subjectName: string }[]
+    > = new Map();
+
+    await this.processBatch(
+      groups,
+      async (group) => {
+        try {
+          const groupData = JSON.parse(group.data as string) as GroupDto;
+          const groupSchedule = await this.retry(
+            () => this.getSchedule(group.foreignId, groupData.forma),
+            {
+              maxAttempts: this.config.retry.maxAttempts,
+              delay: this.config.retry.delay,
+            },
+          );
+
+          const relations: { teacherId: string; subjectName: string }[] = [];
+
+          for (const schedule of groupSchedule) {
+            allSubjects.add(schedule.disciplName);
+
+            const teacher = teacherCache.get(schedule.prepodLogin);
+            if (!teacher) {
+              this.logWarn(`Преподаватель не найден: ${schedule.prepodLogin}`);
+              continue;
+            }
+
+            relations.push({
+              teacherId: teacher.id,
+              subjectName: schedule.disciplName,
+            });
+          }
+
+          allRelations.set(group.id, relations);
+          return relations.length;
+        } catch (error) {
+          const err = this.normalizeError(error);
+          this.logError(`Ошибка обработки группы ${group.id}`, err);
+          this.incrementErrorCount(err.message);
+          return 0;
+        }
+      },
+      (count) => {
+        this.result.subjectsProcessed += count;
+      },
+    );
+
+    if (allSubjects.size > 0) {
+      this.logInfo(`📚 Синхронизация ${allSubjects.size} уникальных предметов`);
+      await this.syncService.syncSubjectsBatch(Array.from(allSubjects));
+    }
+
+    if (allRelations.size > 0) {
+      this.logInfo(`🔄 Синхронизация связей для ${allRelations.size} групп`);
+      await this.syncService.syncRelationsBatch(allRelations);
+    }
+
+    this.logSuccess(
+      `Обработка связей завершена: ${allSubjects.size} предметов, ${allRelations.size} групп`,
+    );
   }
 
   async processGroups(): Promise<void> {
@@ -47,8 +141,8 @@ export class ParserService extends BaseService {
       async (number) => {
         try {
           const groups = await this.retry(() => this.getGroups(number), {
-            maxAttempts: 3,
-            delay: 500,
+            maxAttempts: this.config.retry.maxAttempts,
+            delay: this.config.retry.delay,
           });
 
           if (groups.length === 0) {
@@ -90,8 +184,8 @@ export class ParserService extends BaseService {
       async (letter) => {
         try {
           const teachers = await this.retry(() => this.getTeachers(letter), {
-            maxAttempts: 3,
-            delay: 500,
+            maxAttempts: this.config.retry.maxAttempts,
+            delay: this.config.retry.delay,
           });
 
           if (teachers.length === 0) {
@@ -125,14 +219,21 @@ export class ParserService extends BaseService {
     processor: (item: T) => Promise<R>,
     onResult: (result: R) => void,
   ): Promise<void> {
-    for (let i = 0; i < items.length; i += this.CONCURRENCY_LIMIT) {
-      const batch = items.slice(i, i + this.CONCURRENCY_LIMIT);
+    for (let i = 0; i < items.length; i += this.config.concurrency.limit) {
+      const batch = items.slice(i, i + this.config.concurrency.limit);
       const batchResults = await Promise.all(batch.map(processor));
+      if (this.config.rateLimit.delayBetweenBatches > 0) {
+        await this.delay(this.config.rateLimit.delayBetweenBatches);
+      }
       batchResults.forEach(onResult);
     }
   }
 
-  async getTeachers(query: string = ''): Promise<ParsedTeacherDto[]> {
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async getTeachers(query: string = ''): Promise<TeacherDto[]> {
     const url = 'https://kai.ru/for-staff/raspisanie';
 
     const params = new URLSearchParams({
@@ -143,34 +244,42 @@ export class ParserService extends BaseService {
     });
 
     try {
-      const response = await axios.get(`${url}?${params}`, {
+      const response = await fetch(`${url}?${params}`, {
+        method: 'GET',
         headers: {
           Accept: 'application/json, text/javascript, */*; q=0.01',
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           Referer: 'https://kai.ru/for-staff/raspisanie',
         },
-        timeout: 30000,
       });
 
-      if (!Array.isArray(response.data)) {
+      if (response.status === 404) {
+        return [];
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
         this.logWarn(
-          `Неожиданный формат данных для запроса "${query}": ${typeof response.data}`,
+          `Неожиданный формат данных для запроса "${query}": ${typeof data}`,
         );
         return [];
       }
 
-      return response.data as ParsedTeacherDto[];
+      return data as TeacherDto[];
     } catch (error) {
       const err = this.normalizeError(error);
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        return [];
-      }
       throw err;
     }
   }
 
-  async getGroups(query: string = ''): Promise<ParsedGroupDto[]> {
+  async getGroups(query: string = ''): Promise<GroupDto[]> {
     const url = 'https://kai.ru/web/studentu/raspisanie1';
 
     const params = new URLSearchParams({
@@ -181,131 +290,88 @@ export class ParserService extends BaseService {
     });
 
     try {
-      const response = await axios.get(`${url}?${params}`, {
+      const response = await fetch(`${url}?${params}`, {
+        method: 'GET',
         headers: {
           Accept: 'application/json, text/javascript, */*; q=0.01',
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           Referer: 'https://kai.ru/web/studentu/raspisanie1',
         },
-        timeout: 30000,
       });
 
-      if (!Array.isArray(response.data)) {
+      if (response.status === 404) {
+        return [];
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
         this.logWarn(
-          `Неожиданный формат данных для запроса "${query}": ${typeof response.data}`,
+          `Неожиданный формат данных для запроса "${query}": ${typeof data}`,
         );
         return [];
       }
 
-      return response.data as ParsedGroupDto[];
+      return data as GroupDto[];
     } catch (error) {
       const err = this.normalizeError(error);
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        return [];
-      }
       throw err;
     }
   }
 
-  // /**
-  //  * Создание списка предметов на основе данных преподавателей и групп
-  //  */
-  // async parseSubjects(
-  //   teachers: ParsedTeacherDto[],
-  //   groups: ParsedGroupDto[],
-  // ): Promise<ParsedSubjectDto[]> {
-  //   this.logInfo('Формируем список предметов из данных преподавателей и групп');
+  async getSchedule(
+    groupId: string,
+    programForm: string,
+  ): Promise<ScheduleLessonDto[]> {
+    const url = 'https://kai.ru/web/studentu/raspisanie1';
 
-  //   const subjectsMap = new Map<string, ParsedSubjectDto>();
+    const params = new URLSearchParams({
+      p_p_id: 'pubStudentSchedule_WAR_publicStudentSchedule10',
+      p_p_lifecycle: '2',
+      p_p_resource_id: 'schedule',
+    });
 
-  //   // Собираем предметы от преподавателей
-  //   teachers.forEach((teacher) => {
-  //     teacher.subjects.forEach((subjectName) => {
-  //       if (!subjectsMap.has(subjectName)) {
-  //         subjectsMap.set(subjectName, {
-  //           name: subjectName,
-  //           teacherIds: [],
-  //           groupIds: [],
-  //         });
-  //       }
+    const body = new URLSearchParams();
+    body.append('groupId', groupId);
+    body.append('programForm', programForm);
 
-  //       const subject = subjectsMap.get(subjectName)!;
-  //       if (!subject.teacherIds.includes(teacher.foreignId)) {
-  //         subject.teacherIds.push(teacher.foreignId);
-  //       }
-  //     });
-  //   });
+    try {
+      const response = await fetch(`${url}?${params}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Referer: 'https://kai.ru/web/studentu/raspisanie1',
+        },
+        body: body.toString(),
+      });
 
-  //   // Добавляем связи с группами
-  //   groups.forEach((group) => {
-  //     group.subjects.forEach((subjectName) => {
-  //       if (!subjectsMap.has(subjectName)) {
-  //         subjectsMap.set(subjectName, {
-  //           name: subjectName,
-  //           teacherIds: [],
-  //           groupIds: [],
-  //         });
-  //       }
+      if (response.status === 404) {
+        return [];
+      }
 
-  //       const subject = subjectsMap.get(subjectName)!;
-  //       if (!subject.groupIds.includes(group.foreignId)) {
-  //         subject.groupIds.push(group.foreignId);
-  //       }
-  //     });
-  //   });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-  //   const subjects = Array.from(subjectsMap.values());
-  //   this.logInfo(`Сформировано предметов: ${subjects.length}`);
-
-  //   return subjects;
-  // }
-
-  // /**
-  //  * Тестовые данные для разработки
-  //  */
-  // private getMockTeachers(): ParsedTeacherDto[] {
-  //   return [
-  //     {
-  //       fullName: 'Иванов Иван Иванович',
-  //       foreignId: 'TEACHER_001',
-  //       subjects: ['Математика', 'Алгебра'],
-  //     },
-  //     {
-  //       fullName: 'Петров Петр Петрович',
-  //       foreignId: 'TEACHER_002',
-  //       subjects: ['Физика', 'Механика'],
-  //     },
-  //     {
-  //       fullName: 'Сидорова Анна Александровна',
-  //       foreignId: 'TEACHER_003',
-  //       subjects: ['Химия', 'Органическая химия'],
-  //     },
-  //   ];
-  // }
-
-  // private getMockGroups(): ParsedGroupDto[] {
-  //   return [
-  //     {
-  //       number: '4312',
-  //       foreignId: 'GROUP_4312',
-  //       educationForm: 'Очная',
-  //       subjects: ['Математика', 'Физика', 'Химия'],
-  //     },
-  //     {
-  //       number: '4313',
-  //       foreignId: 'GROUP_4313',
-  //       educationForm: 'Очная',
-  //       subjects: ['Математика', 'Физика'],
-  //     },
-  //     {
-  //       number: '4314',
-  //       foreignId: 'GROUP_4314',
-  //       educationForm: 'Заочная',
-  //       subjects: ['Алгебра', 'Механика'],
-  //     },
-  //   ];
-  // }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const result = await response.json();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      return Object.values(result).flat() as ScheduleLessonDto[];
+    } catch (error) {
+      const err = this.normalizeError(error);
+      this.logError(`Ошибка получения расписания для группы ${groupId}`, err);
+      return [];
+    }
+  }
 
   /**
    * Инициализация результата

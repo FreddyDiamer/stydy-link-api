@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../database/database.service';
 import { BaseService, BusinessException } from '@common';
-import { ParsedTeacherDto, ParsedGroupDto } from '../dto/parsed-data.dto';
+import { TeacherDto, GroupDto } from '../dto/parsed-data.dto';
 
 @Injectable()
 export class SyncService extends BaseService {
@@ -9,7 +9,7 @@ export class SyncService extends BaseService {
     super();
   }
 
-  async syncTeachers(teachers: ParsedTeacherDto[]): Promise<number> {
+  async syncTeachers(teachers: TeacherDto[]): Promise<number> {
     if (teachers.length === 0) return 0;
 
     try {
@@ -37,7 +37,7 @@ export class SyncService extends BaseService {
     }
   }
 
-  async syncGroups(groups: ParsedGroupDto[]): Promise<number> {
+  async syncGroups(groups: GroupDto[]): Promise<number> {
     if (groups.length === 0) return 0;
 
     try {
@@ -64,7 +64,7 @@ export class SyncService extends BaseService {
 
   private async syncTeachersInTx(
     tx: any,
-    teachers: ParsedTeacherDto[],
+    teachers: TeacherDto[],
   ): Promise<number> {
     let syncedCount = 0;
     const chunkSize = 100;
@@ -97,10 +97,7 @@ export class SyncService extends BaseService {
     return syncedCount;
   }
 
-  private async syncGroupsInTx(
-    tx: any,
-    groups: ParsedGroupDto[],
-  ): Promise<number> {
+  private async syncGroupsInTx(tx: any, groups: GroupDto[]): Promise<number> {
     let syncedCount = 0;
     const chunkSize = 100;
 
@@ -131,237 +128,238 @@ export class SyncService extends BaseService {
 
     return syncedCount;
   }
+  async getAllGroups() {
+    return await this.db.group.findMany();
+  }
+  async getAllTeachers() {
+    return await this.db.teacher.findMany();
+  }
 
-  // /**
-  //  * Синхронизация предметов с БД
-  //  */
-  // async syncSubjects(subjects: ParsedSubjectDto[]): Promise<void> {
-  //   try {
-  //     this.logInfo(`Начинаем синхронизацию ${subjects.length} предметов`);
+  /**
+   * Батчевая синхронизация предметов с БД
+   */
+  async syncSubjectsBatch(subjects: string[]): Promise<void> {
+    if (subjects.length === 0) return;
 
-  //     for (const subject of subjects) {
-  //       await this.db.subject.upsert({
-  //         where: { name: subject.name },
-  //         update: {
-  //           updatedAt: new Date(),
-  //         },
-  //         create: {
-  //           name: subject.name,
-  //         },
-  //       });
-  //     }
+    try {
+      this.logInfo(
+        `Начинаем батчевую синхронизацию ${subjects.length} предметов`,
+      );
 
-  //     this.logInfo(
-  //       `Синхронизация предметов завершена: ${subjects.length} записей`,
-  //     );
-  //   } catch (error) {
-  //     this.logError('Ошибка при синхронизации предметов', error as Error);
-  //     throw new BusinessException('Не удалось синхронизировать предметы');
-  //   }
-  // }
+      await this.retry(
+        async () => {
+          await this.db.$transaction(
+            async (tx) => {
+              const chunkSize = 100;
+              for (let i = 0; i < subjects.length; i += chunkSize) {
+                const chunk = subjects.slice(i, i + chunkSize);
 
-  // /**
-  //  * Синхронизация связей между преподавателями, группами и предметами
-  //  */
-  // async syncRelations(
-  //   teachers: ParsedTeacherDto[],
-  //   groups: ParsedGroupDto[],
-  //   subjects: ParsedSubjectDto[],
-  // ): Promise<void> {
-  //   try {
-  //     this.logInfo('Начинаем синхронизацию связей');
+                await Promise.all(
+                  chunk.map((subject) =>
+                    tx.subject.upsert({
+                      where: { name: subject },
+                      update: {
+                        updatedAt: new Date(),
+                      },
+                      create: {
+                        name: subject,
+                      },
+                    }),
+                  ),
+                );
+              }
+            },
+            {
+              maxWait: 5000,
+              timeout: 30000,
+            },
+          );
+        },
+        { maxAttempts: 2, delay: 1000 },
+      );
 
-  //     // Синхронизируем связи преподаватель-предмет
-  //     await this.syncTeacherSubjects(teachers);
+      this.logInfo(
+        `Батчевая синхронизация предметов завершена: ${subjects.length} записей`,
+      );
+    } catch (error) {
+      this.logError(
+        'Ошибка при батчевой синхронизации предметов',
+        error as Error,
+      );
+      throw new BusinessException('Не удалось синхронизировать предметы');
+    }
+  }
 
-  //     // Синхронизируем связи группа-предмет
-  //     await this.syncGroupSubjects(groups);
+  /**
+   * Батчевая синхронизация связей между преподавателями, группами и предметами
+   */
+  async syncRelationsBatch(
+    relationsMap: Map<string, { teacherId: string; subjectName: string }[]>,
+  ): Promise<void> {
+    try {
+      this.logInfo(
+        `Начинаем батчевую синхронизацию связей для ${relationsMap.size} групп`,
+      );
 
-  //     this.logInfo('Синхронизация связей завершена');
-  //   } catch (error) {
-  //     this.logError('Ошибка при синхронизации связей', error as Error);
-  //     throw new BusinessException('Не удалось синхронизировать связи');
-  //   }
-  // }
+      await this.retry(
+        async () => {
+          await this.db.$transaction(
+            async (tx) => {
+              // Получаем все необходимые данные одним запросом
+              const groupIds = Array.from(relationsMap.keys());
 
-  //   /**
-  //    * Синхронизация связей преподаватель-предмет
-  //    */
-  //   private async syncTeacherSubjects(
-  //     teachers: ParsedTeacherDto[],
-  //   ): Promise<void> {
-  //     this.logInfo('Синхронизируем связи преподаватель-предмет');
+              // Собираем уникальные идентификаторы
+              const uniqueSubjectNames = new Set<string>();
+              const uniqueTeacherIds = new Set<string>();
 
-  //     for (const teacherData of teachers) {
-  //       // Получаем преподавателя из БД
-  //       const teacher = await this.db.teacher.findUnique({
-  //         where: { foreignId: teacherData.id },
-  //       });
+              for (const relations of relationsMap.values()) {
+                for (const relation of relations) {
+                  uniqueSubjectNames.add(relation.subjectName);
+                  uniqueTeacherIds.add(relation.teacherId);
+                }
+              }
 
-  //       if (!teacher) {
-  //         this.logWarn(`Преподаватель не найден: ${teacherData.id}`);
-  //         continue;
-  //       }
+              // Получаем все предметы одним запросом
 
-  //       // Деактивируем все старые связи
-  //       await this.db.teacherSubject.updateMany({
-  //         where: { teacherId: teacher.id },
-  //         data: { isActive: false },
-  //       });
+              const subjects: { name: string; id: string }[] =
+                await tx.subject.findMany({
+                  where: { name: { in: Array.from(uniqueSubjectNames) } },
+                });
 
-  //       // Создаем/активируем связи с предметами
-  //       for (const subjectName of teacherData.subjects) {
-  //         const subject = await this.db.subject.findUnique({
-  //           where: { name: subjectName },
-  //         });
+              const subjectMap = new Map(
+                subjects.map((s: { name: string; id: string }) => [
+                  s.name,
+                  s.id,
+                ]),
+              );
 
-  //         if (!subject) {
-  //           this.logWarn(`Предмет не найден: ${subjectName}`);
-  //           continue;
-  //         }
+              // Деактивируем все старые связи для этих групп
 
-  //         await this.db.teacherSubject.upsert({
-  //           where: {
-  //             teacherId_subjectId: {
-  //               teacherId: teacher.id,
-  //               subjectId: subject.id,
-  //             },
-  //           },
-  //           update: {
-  //             isActive: true,
-  //             updatedAt: new Date(),
-  //           },
-  //           create: {
-  //             teacherId: teacher.id,
-  //             subjectId: subject.id,
-  //             isActive: true,
-  //           },
-  //         });
-  //       }
-  //     }
+              await Promise.all([
+                tx.groupSubject.updateMany({
+                  where: { groupId: { in: groupIds } },
+                  data: { isActive: false },
+                }),
 
-  //     this.logInfo('Связи преподаватель-предмет синхронизированы');
-  //   }
+                tx.groupSubjectTeacher.updateMany({
+                  where: { groupId: { in: groupIds } },
+                  data: { isActive: false },
+                }),
+              ]);
 
-  //   /**
-  //    * Синхронизация связей группа-предмет
-  //    */
-  //   private async syncGroupSubjects(groups: ParsedGroupDto[]): Promise<void> {
-  //     this.logInfo('Синхронизируем связи группа-предмет');
+              // Деактивируем связи преподаватель-предмет
 
-  //     for (const groupData of groups) {
-  //       // Получаем группу из БД
-  //       const group = await this.db.group.findUnique({
-  //         where: { foreignId: groupData.foreignId },
-  //       });
+              await tx.teacherSubject.updateMany({
+                where: { teacherId: { in: Array.from(uniqueTeacherIds) } },
+                data: { isActive: false },
+              });
 
-  //       if (!group) {
-  //         this.logWarn(`Группа не найдена: ${groupData.foreignId}`);
-  //         continue;
-  //       }
+              // Батчим операции для каждой группы
+              const chunkSize = 50;
+              const groupIdsArray = Array.from(relationsMap.entries());
 
-  //       // Удаляем все старые связи группы с предметами
-  //       await this.db.groupSubject.deleteMany({
-  //         where: { groupId: group.id },
-  //       });
+              for (let i = 0; i < groupIdsArray.length; i += chunkSize) {
+                const chunk = groupIdsArray.slice(i, i + chunkSize);
 
-  //       // Создаем новые связи с предметами
-  //       for (const subjectName of groupData.subjects) {
-  //         const subject = await this.db.subject.findUnique({
-  //           where: { name: subjectName },
-  //         });
+                await Promise.all(
+                  chunk.map(async ([groupId, relations]) => {
+                    const operations: Promise<any>[] = [];
 
-  //         if (!subject) {
-  //           this.logWarn(`Предмет не найден: ${subjectName}`);
-  //           continue;
-  //         }
+                    for (const relation of relations) {
+                      const subjectId: string | undefined = subjectMap.get(
+                        relation.subjectName,
+                      );
+                      if (!subjectId) {
+                        this.logWarn(
+                          `Предмет не найден: ${relation.subjectName}`,
+                        );
+                        continue;
+                      }
 
-  //         await this.db.groupSubject.create({
-  //           data: {
-  //             groupId: group.id,
-  //             subjectId: subject.id,
-  //           },
-  //         });
-  //       }
-  //     }
+                      // Создаем/активируем связь преподаватель-предмет
+                      operations.push(
+                        tx.teacherSubject.upsert({
+                          where: {
+                            teacherId_subjectId: {
+                              teacherId: relation.teacherId,
+                              subjectId,
+                            },
+                          },
+                          update: {
+                            isActive: true,
+                            updatedAt: new Date(),
+                          },
+                          create: {
+                            teacherId: relation.teacherId,
+                            subjectId: subjectId,
+                            isActive: true,
+                          },
+                        }),
+                      );
 
-  //     this.logInfo('Связи группа-предмет синхронизированы');
-  //   }
+                      // Создаем/активируем связь группа-предмет
+                      operations.push(
+                        tx.groupSubject.upsert({
+                          where: {
+                            groupId_subjectId: {
+                              groupId: groupId,
+                              subjectId: subjectId,
+                            },
+                          },
+                          update: {
+                            isActive: true,
+                            updatedAt: new Date(),
+                          },
+                          create: {
+                            groupId: groupId,
+                            subjectId: subjectId,
+                            isActive: true,
+                          },
+                        }),
+                      );
 
-  //   /**
-  //    * Получить статистику синхронизации
-  //    */
-  //   async getSyncStats() {
-  //     try {
-  //       const [
-  //         teachersCount,
-  //         groupsCount,
-  //         subjectsCount,
-  //         teacherSubjectsCount,
-  //         groupSubjectsCount,
-  //       ] = await Promise.all([
-  //         this.db.teacher.count(),
-  //         this.db.group.count(),
-  //         this.db.subject.count({ where: { isActive: true } }),
-  //         this.db.teacherSubject.count({ where: { isActive: true } }),
-  //         this.db.groupSubject.count(),
-  //       ]);
+                      // Создаем/активируем связь группа-предмет-преподаватель
+                      operations.push(
+                        tx.groupSubjectTeacher.upsert({
+                          where: {
+                            groupId_subjectId_teacherId: {
+                              groupId: groupId,
+                              subjectId: subjectId,
+                              teacherId: relation.teacherId,
+                            },
+                          },
+                          update: {
+                            isActive: true,
+                            updatedAt: new Date(),
+                          },
+                          create: {
+                            groupId: groupId,
+                            subjectId: subjectId,
+                            teacherId: relation.teacherId,
+                            isActive: true,
+                          },
+                        }),
+                      );
+                    }
 
-  //       return {
-  //         teachers: teachersCount,
-  //         groups: groupsCount,
-  //         subjects: subjectsCount,
-  //         teacherSubjectRelations: teacherSubjectsCount,
-  //         groupSubjectRelations: groupSubjectsCount,
-  //         lastUpdated: new Date(),
-  //       };
-  //     } catch (error) {
-  //       this.logError('Ошибка при получении статистики', error as Error);
-  //       throw new BusinessException(
-  //         'Не удалось получить статистику синхронизации',
-  //       );
-  //     }
-  //   }
+                    await Promise.all(operations);
+                  }),
+                );
+              }
+            },
+            {
+              maxWait: 10000,
+              timeout: 60000,
+            },
+          );
+        },
+        { maxAttempts: 2, delay: 1000 },
+      );
 
-  //   /**
-  //    * Получить статус последней синхронизации
-  //    */
-  //   async getLastSyncStatus() {
-  //     try {
-  //       // Получаем последние обновленные записи
-  //       const [lastTeacher, lastGroup, lastSubject] = await Promise.all([
-  //         this.db.teacher.findFirst({
-  //           orderBy: { updatedAt: 'desc' },
-  //           select: { updatedAt: true },
-  //         }),
-  //         this.db.group.findFirst({
-  //           orderBy: { updatedAt: 'desc' },
-  //           select: { updatedAt: true },
-  //         }),
-  //         this.db.subject.findFirst({
-  //           orderBy: { updatedAt: 'desc' },
-  //           select: { updatedAt: true },
-  //         }),
-  //       ]);
-
-  //       const lastSyncTime = [
-  //         lastTeacher?.updatedAt,
-  //         lastGroup?.updatedAt,
-  //         lastSubject?.updatedAt,
-  //       ]
-  //         .filter(Boolean)
-  //         .sort((a, b) => b.getTime() - a.getTime())[0];
-
-  //       return {
-  //         lastSyncTime,
-  //         status: lastSyncTime ? 'completed' : 'never_synced',
-  //       };
-  //     } catch (error) {
-  //       this.logError(
-  //         'Ошибка при получении статуса синхронизации',
-  //         error as Error,
-  //       );
-  //       throw new BusinessException('Не удалось получить статус синхронизации');
-  //     }
-  //   }
+      this.logInfo('Батчевая синхронизация связей завершена');
+    } catch (error) {
+      this.logError('Ошибка при батчевой синхронизации связей', error as Error);
+      throw new BusinessException('Не удалось синхронизировать связи');
+    }
+  }
 }

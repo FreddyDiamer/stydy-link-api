@@ -107,11 +107,12 @@ model Subject {
   updatedAt DateTime @updatedAt
 
   // Связи
-  teacherSubjects TeacherSubject[]
-  services        Service[]
-  requests        Request[]
-  deals           Deal[]
-  groupSubjects   GroupSubject[]
+  teacherSubjects     TeacherSubject[]
+  services            Service[]
+  requests            Request[]
+  deals               Deal[]
+  groupSubjects       GroupSubject[]
+  GroupSubjectTeacher GroupSubjectTeacher[]
 
   @@unique([name])
   @@map("subjects")
@@ -127,10 +128,11 @@ model Teacher {
   updatedAt DateTime @updatedAt
 
   // Связи
-  teacherSubjects TeacherSubject[]
-  services        Service[]
-  requests        Request[]
-  deals           Deal[]
+  teacherSubjects     TeacherSubject[]
+  services            Service[]
+  requests            Request[]
+  deals               Deal[]
+  GroupSubjectTeacher GroupSubjectTeacher[]
 
   @@unique([foreignId]) // foreignId должен быть уникальным
   @@map("teachers")
@@ -145,8 +147,9 @@ model Group {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  students      User[]
-  groupSubjects GroupSubject[]
+  students            User[]
+  groupSubjects       GroupSubject[]
+  GroupSubjectTeacher GroupSubjectTeacher[]
 
   @@unique([foreignId]) // foreignId должен быть уникальным
   @@map("groups")
@@ -173,6 +176,7 @@ model GroupSubject {
   id        String   @id @default(uuid())
   groupId   String
   subjectId String
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -182,6 +186,24 @@ model GroupSubject {
 
   @@unique([groupId, subjectId])
   @@map("group_subjects")
+}
+
+model GroupSubjectTeacher {
+  id        String   @id @default(uuid())
+  groupId   String
+  subjectId String
+  teacherId String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Связи
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, subjectId, teacherId])
+  @@map("group_subject_teachers")
 }
 
 // =============================================================================
