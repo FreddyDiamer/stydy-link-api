@@ -1,19 +1,15 @@
-import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../../../database/database.service';
-import { BaseService, BusinessException } from '@common';
-import { TeacherDto, GroupDto } from '../dto/parsed-data.dto';
+import { PrismaClient } from '@prisma/client';
+import { TeacherDto, GroupDto } from '../../dto/parsed-data.dto';
+import { retry, normalizeError } from './logger';
 
-@Injectable()
-export class SyncService extends BaseService {
-  constructor(private readonly db: DatabaseService) {
-    super();
-  }
+export class WorkerSyncService {
+  constructor(private readonly db: PrismaClient) {}
 
   async syncTeachers(teachers: TeacherDto[]): Promise<number> {
     if (teachers.length === 0) return 0;
 
     try {
-      return await this.retry(
+      return await retry(
         async () => {
           return await this.db.$transaction(
             async (tx) => {
@@ -28,12 +24,8 @@ export class SyncService extends BaseService {
         { maxAttempts: 2, delay: 1000 },
       );
     } catch (error) {
-      const err = this.normalizeError(error);
-      this.logError(
-        `Ошибка при синхронизации ${teachers.length} преподавателей`,
-        err,
-      );
-      throw new BusinessException('Не удалось синхронизировать преподавателей');
+      const err = normalizeError(error);
+      throw err;
     }
   }
 
@@ -41,7 +33,7 @@ export class SyncService extends BaseService {
     if (groups.length === 0) return 0;
 
     try {
-      return await this.retry(
+      return await retry(
         async () => {
           return await this.db.$transaction(
             async (tx) => {
@@ -56,9 +48,8 @@ export class SyncService extends BaseService {
         { maxAttempts: 2, delay: 1000 },
       );
     } catch (error) {
-      const err = this.normalizeError(error);
-      this.logError(`Ошибка при синхронизации ${groups.length} групп`, err);
-      throw new BusinessException('Не удалось синхронизировать группы');
+      const err = normalizeError(error);
+      throw err;
     }
   }
 
@@ -106,7 +97,7 @@ export class SyncService extends BaseService {
 
       await Promise.all(
         chunk.map((group) =>
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
           tx.group.upsert({
             where: { foreignId: group.id.toString() },
             update: {
@@ -128,25 +119,20 @@ export class SyncService extends BaseService {
 
     return syncedCount;
   }
+
   async getAllGroups() {
     return await this.db.group.findMany();
   }
+
   async getAllTeachers() {
     return await this.db.teacher.findMany();
   }
 
-  /**
-   * Батчевая синхронизация предметов с БД
-   */
   async syncSubjectsBatch(subjects: string[]): Promise<void> {
     if (subjects.length === 0) return;
 
     try {
-      this.logInfo(
-        `Начинаем батчевую синхронизацию ${subjects.length} предметов`,
-      );
-
-      await this.retry(
+      await retry(
         async () => {
           await this.db.$transaction(
             async (tx) => {
@@ -177,38 +163,22 @@ export class SyncService extends BaseService {
         },
         { maxAttempts: 2, delay: 1000 },
       );
-
-      this.logInfo(
-        `Батчевая синхронизация предметов завершена: ${subjects.length} записей`,
-      );
     } catch (error) {
-      this.logError(
-        'Ошибка при батчевой синхронизации предметов',
-        error as Error,
-      );
-      throw new BusinessException('Не удалось синхронизировать предметы');
+      const err = normalizeError(error);
+      throw err;
     }
   }
 
-  /**
-   * Батчевая синхронизация связей между преподавателями, группами и предметами
-   */
   async syncRelationsBatch(
     relationsMap: Map<string, { teacherId: string; subjectName: string }[]>,
   ): Promise<void> {
     try {
-      this.logInfo(
-        `Начинаем батчевую синхронизацию связей для ${relationsMap.size} групп`,
-      );
-
-      await this.retry(
+      await retry(
         async () => {
           await this.db.$transaction(
             async (tx) => {
-              // Получаем все необходимые данные одним запросом
               const groupIds = Array.from(relationsMap.keys());
 
-              // Собираем уникальные идентификаторы
               const uniqueSubjectNames = new Set<string>();
               const uniqueTeacherIds = new Set<string>();
 
@@ -218,8 +188,6 @@ export class SyncService extends BaseService {
                   uniqueTeacherIds.add(relation.teacherId);
                 }
               }
-
-              // Получаем все предметы одним запросом
 
               const subjects: { name: string; id: string }[] =
                 await tx.subject.findMany({
@@ -233,28 +201,24 @@ export class SyncService extends BaseService {
                 ]),
               );
 
-              // Деактивируем все старые связи для этих групп
-
               await Promise.all([
                 tx.groupSubject.updateMany({
                   where: { groupId: { in: groupIds } },
                   data: { isActive: false },
                 }),
 
-                tx.groupSubjectTeacher.updateMany({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                (tx as any).groupSubjectTeacher.updateMany({
                   where: { groupId: { in: groupIds } },
                   data: { isActive: false },
                 }),
               ]);
-
-              // Деактивируем связи преподаватель-предмет
 
               await tx.teacherSubject.updateMany({
                 where: { teacherId: { in: Array.from(uniqueTeacherIds) } },
                 data: { isActive: false },
               });
 
-              // Батчим операции для каждой группы
               const chunkSize = 50;
               const groupIdsArray = Array.from(relationsMap.entries());
 
@@ -270,13 +234,9 @@ export class SyncService extends BaseService {
                         relation.subjectName,
                       );
                       if (!subjectId) {
-                        this.logWarn(
-                          `Предмет не найден: ${relation.subjectName}`,
-                        );
                         continue;
                       }
 
-                      // Создаем/активируем связь преподаватель-предмет
                       operations.push(
                         tx.teacherSubject.upsert({
                           where: {
@@ -297,7 +257,6 @@ export class SyncService extends BaseService {
                         }),
                       );
 
-                      // Создаем/активируем связь группа-предмет
                       operations.push(
                         tx.groupSubject.upsert({
                           where: {
@@ -318,9 +277,9 @@ export class SyncService extends BaseService {
                         }),
                       );
 
-                      // Создаем/активируем связь группа-предмет-преподаватель
                       operations.push(
-                        tx.groupSubjectTeacher.upsert({
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+                        (tx as any).groupSubjectTeacher.upsert({
                           where: {
                             groupId_subjectId_teacherId: {
                               groupId: groupId,
@@ -355,11 +314,9 @@ export class SyncService extends BaseService {
         },
         { maxAttempts: 2, delay: 1000 },
       );
-
-      this.logInfo('Батчевая синхронизация связей завершена');
     } catch (error) {
-      this.logError('Ошибка при батчевой синхронизации связей', error as Error);
-      throw new BusinessException('Не удалось синхронизировать связи');
+      const err = normalizeError(error);
+      throw err;
     }
   }
 }
