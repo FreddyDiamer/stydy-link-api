@@ -4,14 +4,13 @@ import { DatabaseService } from '../../../database/database.service';
 import {
   CreateServiceDto,
   UpdateServiceDto,
-  ServiceFilterDto,
+  ServiceQueryDto,
 } from './dto/service.dto';
 import {
   BaseService,
   BusinessException,
   NotFoundException,
   PaginatedResult,
-  PaginationDto,
 } from '@common';
 
 @Injectable()
@@ -126,59 +125,53 @@ export class ServicesService extends BaseService {
     }
   }
 
-  async findAll(
-    paginationDto: PaginationDto,
-    filterDto: ServiceFilterDto,
-  ): Promise<PaginatedResult<Service>> {
+  async findAll(queryDto: ServiceQueryDto): Promise<PaginatedResult<Service>> {
     try {
       const where: Prisma.ServiceWhereInput = {};
 
       // Фильтры
-      if (filterDto.tutorId) {
-        where.tutorId = filterDto.tutorId;
+      if (queryDto.tutorId) {
+        where.tutorId = queryDto.tutorId;
       }
 
-      if (filterDto.subjectId) {
-        where.subjectId = filterDto.subjectId;
+      if (queryDto.subjectId) {
+        where.subjectId = queryDto.subjectId;
       }
 
-      if (filterDto.teacherId) {
-        where.teacherId = filterDto.teacherId;
+      if (queryDto.teacherId) {
+        where.teacherId = queryDto.teacherId;
       }
 
-      if (filterDto.status) {
-        where.status = filterDto.status;
+      if (queryDto.status) {
+        where.status = queryDto.status;
       }
 
       // Фильтр по цене
-      if (
-        filterDto.minPrice !== undefined ||
-        filterDto.maxPrice !== undefined
-      ) {
+      if (queryDto.minPrice !== undefined || queryDto.maxPrice !== undefined) {
         where.price = {};
-        if (filterDto.minPrice !== undefined) {
-          where.price.gte = filterDto.minPrice;
+        if (queryDto.minPrice !== undefined) {
+          where.price.gte = queryDto.minPrice;
         }
-        if (filterDto.maxPrice !== undefined) {
-          where.price.lte = filterDto.maxPrice;
+        if (queryDto.maxPrice !== undefined) {
+          where.price.lte = queryDto.maxPrice;
         }
       }
 
       // Фильтр по дедлайну
-      if (filterDto.deadlineAfter || filterDto.deadlineBefore) {
+      if (queryDto.deadlineAfter || queryDto.deadlineBefore) {
         where.deadline = {};
-        if (filterDto.deadlineAfter) {
-          where.deadline.gte = new Date(filterDto.deadlineAfter);
+        if (queryDto.deadlineAfter) {
+          where.deadline.gte = new Date(queryDto.deadlineAfter);
         }
-        if (filterDto.deadlineBefore) {
-          where.deadline.lte = new Date(filterDto.deadlineBefore);
+        if (queryDto.deadlineBefore) {
+          where.deadline.lte = new Date(queryDto.deadlineBefore);
         }
       }
 
       // Поиск в описании
-      if (filterDto.search?.trim()) {
+      if (queryDto.search?.trim()) {
         where.description = {
-          contains: filterDto.search.trim(),
+          contains: queryDto.search.trim(),
           mode: 'insensitive',
         };
       }
@@ -186,8 +179,8 @@ export class ServicesService extends BaseService {
       const [items, total] = await Promise.all([
         this.db.service.findMany({
           where,
-          skip: paginationDto.skip,
-          take: paginationDto.limit,
+          skip: queryDto.skip,
+          take: queryDto.limit || 10,
           orderBy: { createdAt: 'desc' },
           include: {
             tutor: {
@@ -223,14 +216,13 @@ export class ServicesService extends BaseService {
       return {
         items,
         total,
-        page: paginationDto.page,
-        limit: paginationDto.limit,
-        totalPages: Math.ceil(total / paginationDto.limit),
+        page: queryDto.page || 1,
+        limit: queryDto.limit || 10,
+        totalPages: Math.ceil(total / (queryDto.limit || 10)),
       };
     } catch (error) {
       this.logError('Ошибка получения списка услуг', error as Error, {
-        pagination: paginationDto,
-        filter: filterDto,
+        query: queryDto,
       });
       throw new BusinessException('Не удалось получить список услуг');
     }

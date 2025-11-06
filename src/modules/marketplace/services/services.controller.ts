@@ -15,9 +15,9 @@ import {
   CreateServiceDto,
   UpdateServiceDto,
   ServiceResponseDto,
-  ServiceFilterDto,
+  ServiceQueryDto,
 } from './dto/service.dto';
-import { PaginationDto, ApiSuccessResponse, CurrentUser } from '@common';
+import { ApiSuccessResponse, CurrentUser } from '@common';
 import { User } from '@prisma/client';
 
 @ApiTags('Marketplace - Services')
@@ -45,11 +45,8 @@ export class ServicesController {
     description: 'Получить список услуг репетиторов с фильтрацией и пагинацией',
   })
   @ApiSuccessResponse(ServiceResponseDto)
-  async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: ServiceFilterDto,
-  ) {
-    return this.servicesService.findAll(paginationDto, filterDto);
+  async findAll(@Query() queryDto: ServiceQueryDto) {
+    return this.servicesService.findAll(queryDto);
   }
 
   @Get('active')

@@ -8,6 +8,7 @@ import {
   IsDateString,
   Min,
   Max,
+  IsInt,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
@@ -153,6 +154,36 @@ export class ServiceFilterDto {
   @IsOptional()
   @IsDateString()
   deadlineAfter?: string;
+}
+
+export class ServiceQueryDto extends ServiceFilterDto {
+  @ApiPropertyOptional({
+    description: 'Page number',
+    minimum: 1,
+    default: 1,
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value))
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
+    minimum: 1,
+    maximum: 100,
+    default: 10,
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value))
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 10;
+
+  get skip(): number {
+    return ((this.page || 1) - 1) * (this.limit || 10);
+  }
 }
 
 export class ServiceResponseDto {

@@ -204,7 +204,7 @@ export class WorkerSyncService {
               await Promise.all([
                 tx.groupSubject.updateMany({
                   where: { groupId: { in: groupIds } },
-                  data: { isActive: false },
+                  data: {},
                 }),
 
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -266,13 +266,11 @@ export class WorkerSyncService {
                             },
                           },
                           update: {
-                            isActive: true,
                             updatedAt: new Date(),
                           },
                           create: {
                             groupId: groupId,
                             subjectId: subjectId,
-                            isActive: true,
                           },
                         }),
                       );
