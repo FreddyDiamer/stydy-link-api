@@ -23,7 +23,7 @@ export class AuthService {
   async loginOrRegister(authDto: TelegramAuthDto): Promise<AuthResponseDto> {
     try {
       // Валидируем initData строку
-      const botToken = this.configService.get<string>('telegram.botToken');
+      const botToken = this.configService.get<string>('app.telegramBotToken');
       if (
         botToken &&
         !this.validateTelegramInitData(authDto.initData, botToken)
