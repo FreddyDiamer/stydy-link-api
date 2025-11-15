@@ -80,6 +80,15 @@ export class DealsService extends BaseService {
         skip: pagination.skip,
         take: pagination.limit,
         orderBy: { createdAt: 'desc' },
+        include: {
+          student: true,
+          tutor: true,
+          subject: true,
+          teacher: true,
+          serviceResponse: true,
+          requestResponse: true,
+          review: true,
+        },
       }),
       this.db.deal.count({ where }),
     ]);
@@ -93,7 +102,18 @@ export class DealsService extends BaseService {
   }
 
   async findOne(id: string) {
-    const item = await this.db.deal.findUnique({ where: { id } });
+    const item = await this.db.deal.findUnique({
+      where: { id },
+      include: {
+        student: true,
+        tutor: true,
+        subject: true,
+        teacher: true,
+        serviceResponse: true,
+        requestResponse: true,
+        review: true,
+      },
+    });
     if (!item) throw new NotFoundException('Deal', id);
     return item;
   }

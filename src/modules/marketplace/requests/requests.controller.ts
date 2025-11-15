@@ -50,7 +50,6 @@ export class RequestsController {
   })
   @ApiSuccessResponse(RequestResponseDto)
   async findAll(@Query() filterDto: RequestFilterDto) {
-    console.log('🚀 ~ RequestsController ~ findAll ~ filterDto:', filterDto);
     return this.requestsService.findAll(filterDto);
   }
 

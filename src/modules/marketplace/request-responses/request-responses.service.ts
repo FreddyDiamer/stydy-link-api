@@ -6,7 +6,7 @@ import {
   RequestResponseFilterDto,
 } from './dto/request-response.dto';
 import { BaseService, BusinessException, NotFoundException } from '@common';
-import { Prisma, RequestResponse } from '@prisma/client';
+import { Prisma, RequestResponse, User } from '@prisma/client';
 
 @Injectable()
 export class RequestResponsesService extends BaseService {
@@ -14,7 +14,7 @@ export class RequestResponsesService extends BaseService {
     super();
   }
 
-  async create(dto: CreateRequestResponseDto) {
+  async create(dto: CreateRequestResponseDto, user: User) {
     // Проверка существования репетитора и заявки
     const [tutor, request] = await Promise.all([
       this.db.user.findUnique({ where: { id: dto.tutorId } }),
@@ -22,6 +22,11 @@ export class RequestResponsesService extends BaseService {
     ]);
     if (!tutor) throw new NotFoundException('User', dto.tutorId);
     if (!request) throw new NotFoundException('Request', dto.requestId);
+
+    if (tutor.id === user.id) {
+      throw new BusinessException('Нельзя откликаться на свой заказ');
+    }
+
     // Проверка на дубликат отклика
     const exists = await this.db.requestResponse.findFirst({
       where: { tutorId: dto.tutorId, requestId: dto.requestId },

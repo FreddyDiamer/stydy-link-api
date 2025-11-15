@@ -17,7 +17,8 @@ import {
   RequestResponseResponseDto,
   RequestResponseFilterDto,
 } from './dto/request-response.dto';
-import { ApiSuccessResponse } from '@common';
+import { ApiSuccessResponse, CurrentUser } from '@common';
+import { User } from '@prisma/client';
 
 @ApiTags('Marketplace - Request Responses')
 @Controller('marketplace/request-responses')
@@ -28,8 +29,8 @@ export class RequestResponsesController {
   @Post()
   @ApiOperation({ summary: 'Создать отклик на заявку' })
   @ApiSuccessResponse(RequestResponseResponseDto)
-  create(@Body() dto: CreateRequestResponseDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateRequestResponseDto, @CurrentUser() user: User) {
+    return this.service.create(dto, user);
   }
 
   @Get()
