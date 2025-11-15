@@ -49,20 +49,21 @@ export class RequestsService extends BaseService {
         throw new NotFoundException('Teacher', createRequestDto.teacherId);
       }
 
+      // TODO вернуть проверку
       // Проверяем, что существует активная связь между преподавателем и предметом
-      const teacherSubject = await this.db.teacherSubject.findFirst({
-        where: {
-          teacherId: createRequestDto.teacherId,
-          subjectId: createRequestDto.subjectId,
-          isActive: true,
-        },
-      });
+      // const teacherSubject = await this.db.teacherSubject.findFirst({
+      //   where: {
+      //     teacherId: createRequestDto.teacherId,
+      //     subjectId: createRequestDto.subjectId,
+      //     isActive: true,
+      //   },
+      // });
 
-      if (!teacherSubject) {
-        throw new BusinessException(
-          `Преподаватель "${teacher.fullName}" не ведет предмет "${subject.name}" или связь неактивна`,
-        );
-      }
+      // if (!teacherSubject) {
+      //   throw new BusinessException(
+      //     `Преподаватель "${teacher.fullName}" не ведет предмет "${subject.name}" или связь неактивна`,
+      //   );
+      // }
 
       // Создаем заявку
       const request = await this.db.request.create({
