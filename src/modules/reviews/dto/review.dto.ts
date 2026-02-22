@@ -71,6 +71,18 @@ export class CreateReviewDto {
 
 export class UpdateReviewDto extends PartialType(CreateReviewDto) {}
 
+export class SetReviewReplyDto {
+  @ApiPropertyOptional({
+    description:
+      'Текст ответа на отзыв (null или пустая строка = удалить ответ)',
+    example: 'Спасибо за отзыв!',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  reply?: string | null;
+}
+
 export class ReviewFilterDto {
   @ApiPropertyOptional({
     description: 'Фильтр по ID автора отзыва',
@@ -178,6 +190,12 @@ export class ReviewResponseDto {
       'Отличный репетитор! Все объяснил понятно, помог подготовиться к экзамену.',
   })
   comment?: string;
+
+  @ApiPropertyOptional({
+    description: 'Ответ репетитора на отзыв',
+    example: 'Спасибо за отзыв! Рад был помочь.',
+  })
+  reply?: string;
 
   @ApiProperty({
     description: 'Дата создания отзыва',

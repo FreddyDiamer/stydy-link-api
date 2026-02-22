@@ -17,7 +17,7 @@ import {
   RequestResponseDto,
   RequestFilterDto,
 } from './dto/request.dto';
-import { PaginationDto, ApiSuccessResponse, CurrentUser } from '@common';
+import { ApiSuccessResponse, CurrentUser } from '@common';
 import { User } from '@prisma/client';
 
 @ApiTags('Marketplace - Requests')
@@ -49,8 +49,11 @@ export class RequestsController {
     description: 'Получить список заявок студентов с фильтрацией и пагинацией',
   })
   @ApiSuccessResponse(RequestResponseDto)
-  async findAll(@Query() filterDto: RequestFilterDto) {
-    return this.requestsService.findAll(filterDto);
+  async findAll(
+    @Query() filterDto: RequestFilterDto,
+    @CurrentUser() user?: User,
+  ) {
+    return this.requestsService.findAll(filterDto, user?.id);
   }
 
   @Get('open')
@@ -59,8 +62,8 @@ export class RequestsController {
     description: 'Получить список открытых заявок для репетиторов',
   })
   @ApiSuccessResponse(RequestResponseDto)
-  async findOpen() {
-    const requests = await this.requestsService.findOpenRequests();
+  async findOpen(@CurrentUser() user?: User) {
+    const requests = await this.requestsService.findOpenRequests(user?.id);
     return {
       items: requests,
       total: requests.length,

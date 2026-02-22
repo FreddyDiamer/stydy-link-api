@@ -9,7 +9,9 @@ import { UsersModule } from './modules/users/users.module';
 import { EducationModule } from './modules/education/education.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { TutorsModule } from './modules/tutors/tutors.module';
 import { ParserModule } from './modules/parser/parser.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { JwtAuthGuard, TransformInterceptor } from '@common';
 import { appConfig, databaseConfig, jwtConfig } from './config';
 
@@ -26,6 +28,8 @@ import { appConfig, databaseConfig, jwtConfig } from './config';
     EducationModule,
     MarketplaceModule,
     ReviewsModule,
+    NotificationsModule,
+    TutorsModule,
     ParserModule,
   ],
   controllers: [AppController],

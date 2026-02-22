@@ -19,7 +19,11 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prepare": "husky"
+    "prepare": "husky",
+    "prisma:seed": "ts-node -O '{\"module\":\"commonjs\"}' prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node -O '{\"module\":\"commonjs\"}' prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -41,7 +45,14 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "uuid": "^11.1.0",
-    "zod": "^3.25.48"
+    "telegraf": "^4.16.3",
+    "zod": "^3.25.48",
+    "iconv-lite": "^0.6.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "iconv-lite": "0.6.3"
+    }
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

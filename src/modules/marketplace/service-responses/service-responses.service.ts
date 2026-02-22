@@ -9,14 +9,19 @@ import {
 import {
   BaseService,
   BusinessException,
+  ForbiddenException,
   NotFoundException,
   PaginatedResult,
   PaginationDto,
 } from '@common';
+import { NotificationService } from '../../notifications/notification.service';
 
 @Injectable()
 export class ServiceResponsesService extends BaseService {
-  constructor(private readonly db: DatabaseService) {
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly notificationService: NotificationService,
+  ) {
     super();
   }
 
@@ -126,6 +131,29 @@ export class ServiceResponsesService extends BaseService {
         proposedPrice: serviceResponse.price,
       });
 
+      void this.notificationService.notifyServiceResponseCreated({
+        recipientUserId: service.tutorId,
+        actorName: (student as { name: string }).name,
+        actorUserId: createServiceResponseDto.studentId,
+        subjectName: service.subject.name,
+        studentId: createServiceResponseDto.studentId,
+        serviceId: createServiceResponseDto.serviceId,
+        responseId: serviceResponse.id,
+        price:
+          (serviceResponse as { price?: number | null }).price ??
+          createServiceResponseDto.price ??
+          null,
+        message:
+          (serviceResponse as { message?: string | null }).message ??
+          createServiceResponseDto.message ??
+          null,
+        proposedDeadline:
+          (serviceResponse as { proposedDeadline?: Date | string | null })
+            .proposedDeadline ??
+          createServiceResponseDto.proposedDeadline ??
+          null,
+      });
+
       return serviceResponse;
     } catch (error) {
       if (
@@ -136,7 +164,7 @@ export class ServiceResponsesService extends BaseService {
       }
       this.logError(
         'Ошибка создания отклика на услугу',
-        error as Error,
+        error instanceof Error ? error : undefined,
         createServiceResponseDto,
       );
       throw new BusinessException('Не удалось создать отклик на услугу');
@@ -146,7 +174,7 @@ export class ServiceResponsesService extends BaseService {
   async findAll(
     paginationDto: PaginationDto,
     filterDto: ServiceResponseFilterDto,
-  ): Promise<PaginatedResult<any>> {
+  ): Promise<PaginatedResult<ServiceResponse>> {
     try {
       const where: Prisma.ServiceResponseWhereInput = {};
 
@@ -160,7 +188,8 @@ export class ServiceResponsesService extends BaseService {
       }
 
       if (filterDto.status) {
-        where.status = filterDto.status as any; // TODO: исправить после обновления типов
+        where.status =
+          filterDto.status as Prisma.ServiceResponseWhereInput['status'];
       }
 
       // Фильтр по цене
@@ -388,7 +417,8 @@ export class ServiceResponsesService extends BaseService {
             price: updateServiceResponseDto.price,
           }),
           ...(updateServiceResponseDto.status && {
-            status: updateServiceResponseDto.status as any,
+            status:
+              updateServiceResponseDto.status as Prisma.ServiceResponseUpdateInput['status'],
           }),
           // TODO: добавить proposedDeadline после обновления Prisma client
           updatedAt: new Date(),
@@ -441,51 +471,95 @@ export class ServiceResponsesService extends BaseService {
       ) {
         throw error;
       }
-      this.logError('Ошибка обновления отклика на услугу', error as Error, {
-        id,
-        ...updateServiceResponseDto,
-      });
+      this.logError(
+        'Ошибка обновления отклика на услугу',
+        error instanceof Error ? error : undefined,
+        {
+          id,
+          ...updateServiceResponseDto,
+        },
+      );
       throw new BusinessException('Не удалось обновить отклик на услугу');
     }
   }
 
   async accept(id: string, user: User): Promise<ServiceResponse> {
-    // Проверяем, что отклик принимает владелец услуги
     const response = await this.findOne(id);
+    const responseWithService = response as ServiceResponse & {
+      service?: {
+        tutor?: { id: string; name: string };
+        subject?: { name: string };
+      };
+    };
     const service = await this.db.service.findUnique({
       where: { id: response.serviceId },
+      select: { tutorId: true },
     });
-
     if (!service) {
       throw new NotFoundException('Service', response.serviceId);
     }
-
-    if (service.tutorId !== user.id) {
-      throw new Error('Только автор услуги может принимать отклики');
+    const tutorId = String(service.tutorId);
+    const userId = String(
+      (user as { id?: string; sub?: string }).id ??
+        (user as { id?: string; sub?: string }).sub ??
+        '',
+    );
+    if (tutorId !== userId) {
+      throw new ForbiddenException(
+        'Только автор услуги может принимать отклики',
+      );
     }
-    return this.update(id, { status: 'ACCEPTED' as any });
+    const updated = await this.update(id, { status: 'ACCEPTED' });
+    void this.notificationService.notifyServiceResponseAccepted({
+      recipientUserId: response.studentId,
+      actorName: responseWithService.service?.tutor?.name ?? 'Репетитор',
+      actorUserId: responseWithService.service?.tutor?.id ?? tutorId,
+      responseId: id,
+      serviceId: response.serviceId,
+      subjectName: responseWithService.service?.subject?.name,
+    });
+    return updated;
   }
 
   async reject(id: string, user: User): Promise<ServiceResponse> {
-    // Проверяем, что отклик принимает владелец услуги
     const response = await this.findOne(id);
+    const responseWithService = response as ServiceResponse & {
+      service?: {
+        tutor?: { id: string; name: string };
+        subject?: { name: string };
+      };
+    };
     const service = await this.db.service.findUnique({
       where: { id: response.serviceId },
+      select: { tutorId: true },
     });
-
     if (!service) {
       throw new NotFoundException('Service', response.serviceId);
     }
-
-    if (service.tutorId !== user.id) {
-      throw new Error('Только автор услуги может принимать отклики');
+    const tutorId = String(service.tutorId);
+    const userId = String(
+      (user as { id?: string; sub?: string }).id ??
+        (user as { id?: string; sub?: string }).sub ??
+        '',
+    );
+    if (tutorId !== userId) {
+      throw new ForbiddenException(
+        'Только автор услуги может принимать отклики',
+      );
     }
-
-    return this.update(id, { status: 'REJECTED' as any });
+    const updated = await this.update(id, { status: 'REJECTED' });
+    void this.notificationService.notifyServiceResponseRejected({
+      recipientUserId: response.studentId,
+      actorName: responseWithService.service?.tutor?.name ?? 'Репетитор',
+      actorUserId: responseWithService.service?.tutor?.id ?? tutorId,
+      responseId: id,
+      subjectName: responseWithService.service?.subject?.name,
+    });
+    return updated;
   }
 
   async expire(id: string): Promise<ServiceResponse> {
-    return this.update(id, { status: 'EXPIRED' as any });
+    return this.update(id, { status: 'EXPIRED' });
   }
 
   async remove(id: string): Promise<void> {
@@ -511,9 +585,13 @@ export class ServiceResponsesService extends BaseService {
       ) {
         throw error;
       }
-      this.logError('Ошибка удаления отклика на услугу', error as Error, {
-        id,
-      });
+      this.logError(
+        'Ошибка удаления отклика на услугу',
+        error instanceof Error ? error : undefined,
+        {
+          id,
+        },
+      );
       throw new BusinessException('Не удалось удалить отклик на услугу');
     }
   }

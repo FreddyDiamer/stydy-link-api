@@ -4,19 +4,25 @@ import { DatabaseService } from '../../database/database.service';
 import {
   CreateReviewDto,
   UpdateReviewDto,
+  SetReviewReplyDto,
   ReviewFilterDto,
 } from './dto/review.dto';
 import {
   BaseService,
   BusinessException,
+  ForbiddenException,
   NotFoundException,
   PaginatedResult,
   PaginationDto,
 } from '@common';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class ReviewsService extends BaseService {
-  constructor(private readonly db: DatabaseService) {
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly notificationService: NotificationService,
+  ) {
     super();
   }
 
@@ -111,6 +117,20 @@ export class ReviewsService extends BaseService {
         targetRole: review.targetRole,
       });
 
+      const dealData = review.deal as
+        | { subject?: { name: string } }
+        | undefined;
+      void this.notificationService.notifyReviewCreated({
+        recipientUserId: review.targetId,
+        actorName: review.author.name,
+        actorUserId: review.authorId,
+        reviewId: review.id,
+        dealId: review.dealId,
+        subjectName: dealData?.subject?.name,
+        rating: review.rating,
+        comment: review.comment ?? null,
+      });
+
       return review;
     } catch (error) {
       if (
@@ -141,7 +161,8 @@ export class ReviewsService extends BaseService {
       }
 
       if (filterDto.targetRole) {
-        where.targetRole = filterDto.targetRole as any;
+        where.targetRole =
+          filterDto.targetRole as Prisma.ReviewWhereInput['targetRole'];
       }
 
       // Фильтр по рейтингу
@@ -250,9 +271,18 @@ export class ReviewsService extends BaseService {
     return review;
   }
 
-  async findByTarget(targetId: string): Promise<Review[]> {
+  async findByTarget(
+    targetId: string,
+    targetRole?: 'TUTOR' | 'STUDENT',
+  ): Promise<Review[]> {
+    const where: { targetId: string; targetRole?: 'TUTOR' | 'STUDENT' } = {
+      targetId,
+    };
+    if (targetRole) {
+      where.targetRole = targetRole;
+    }
     return this.db.review.findMany({
-      where: { targetId },
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         author: {
@@ -294,10 +324,39 @@ export class ReviewsService extends BaseService {
     });
   }
 
+  async findByDeal(dealId: string): Promise<Review[]> {
+    return this.db.review.findMany({
+      where: { dealId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            telegramUsername: true,
+          },
+        },
+        target: {
+          select: {
+            id: true,
+            name: true,
+            telegramUsername: true,
+          },
+        },
+        deal: {
+          include: {
+            subject: { select: { name: true } },
+            teacher: { select: { fullName: true } },
+          },
+        },
+      },
+    });
+  }
+
   async update(id: string, updateReviewDto: UpdateReviewDto): Promise<Review> {
     try {
       // Проверяем существование отзыва
-      const existingReview = await this.findOne(id);
+      await this.findOne(id);
 
       // Нельзя изменять ключевые поля после создания
       if (
@@ -381,22 +440,83 @@ export class ReviewsService extends BaseService {
     }
   }
 
-  async getTargetStats(targetId: string) {
+  async setReply(
+    id: string,
+    userId: string,
+    dto: SetReviewReplyDto,
+  ): Promise<Review> {
+    const review = (await this.findOne(id)) as {
+      targetId: string;
+      authorId: string;
+      dealId: string;
+    };
+    if (review.targetId !== userId) {
+      throw new ForbiddenException(
+        'Ответ на отзыв может оставить только репетитор, которому оставлен отзыв',
+      );
+    }
+    const replyValue =
+      dto.reply === undefined
+        ? undefined
+        : dto.reply === '' || dto.reply === null
+          ? null
+          : dto.reply;
+    const updated = await this.db.review.update({
+      where: { id },
+      data: {
+        ...(replyValue !== undefined ? { reply: replyValue } : {}),
+        updatedAt: new Date(),
+      },
+      include: {
+        author: { select: { id: true, name: true, telegramUsername: true } },
+        target: { select: { id: true, name: true, telegramUsername: true } },
+        deal: {
+          include: {
+            subject: { select: { name: true } },
+            teacher: { select: { fullName: true } },
+          },
+        },
+      },
+    });
+    this.logInfo('Ответ на отзыв обновлен', { reviewId: id });
+    const updatedWithRelations = updated as Review & {
+      authorId: string;
+      target?: { name: string };
+      targetId: string;
+      dealId: string;
+      deal?: { subject?: { name: string } };
+    };
+    const updatedDeal = updatedWithRelations.deal;
+    void this.notificationService.notifyReviewReply({
+      recipientUserId: updatedWithRelations.authorId,
+      actorName: updatedWithRelations.target?.name ?? 'Репетитор',
+      actorUserId: updatedWithRelations.targetId,
+      reviewId: id,
+      dealId: updatedWithRelations.dealId ?? review.dealId,
+      subjectName: updatedDeal?.subject?.name,
+    });
+    return updated;
+  }
+
+  async getTargetStats(targetId: string, targetRole?: 'TUTOR' | 'STUDENT') {
+    const where: { targetId: string; targetRole?: 'TUTOR' | 'STUDENT' } = {
+      targetId,
+    };
+    if (targetRole) {
+      where.targetRole = targetRole;
+    }
     const [reviews, avgRating, ratingDistribution] = await Promise.all([
-      // Все отзывы
       this.db.review.findMany({
-        where: { targetId },
+        where,
         select: { rating: true, createdAt: true },
       }),
-      // Средний рейтинг
       this.db.review.aggregate({
-        where: { targetId },
+        where,
         _avg: { rating: true },
       }),
-      // Распределение по рейтингам
       this.db.review.groupBy({
         by: ['rating'],
-        where: { targetId },
+        where,
         _count: { rating: true },
       }),
     ]);

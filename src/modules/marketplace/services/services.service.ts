@@ -126,7 +126,14 @@ export class ServicesService extends BaseService {
     }
   }
 
-  async findAll(queryDto: ServiceQueryDto): Promise<PaginatedResult<Service>> {
+  async findAll(
+    queryDto: ServiceQueryDto,
+    currentUserId?: string,
+  ): Promise<
+    PaginatedResult<
+      Service & { isOwnService?: boolean; currentUserResponded?: boolean }
+    >
+  > {
     try {
       const where: Prisma.ServiceWhereInput = {};
 
@@ -214,8 +221,28 @@ export class ServicesService extends BaseService {
         this.db.service.count({ where }),
       ]);
 
+      let resultItems = items;
+      if (currentUserId != null) {
+        const serviceIdsWithMyResponse = new Set(
+          (
+            await this.db.serviceResponse.findMany({
+              where: {
+                studentId: currentUserId,
+                serviceId: { in: items.map((i) => i.id) },
+              },
+              select: { serviceId: true },
+            })
+          ).map((r) => r.serviceId),
+        );
+        resultItems = items.map((item) => ({
+          ...item,
+          isOwnService: item.tutorId === currentUserId,
+          currentUserResponded: serviceIdsWithMyResponse.has(item.id),
+        }));
+      }
+
       return {
-        items,
+        items: resultItems,
         total,
         page: queryDto.page || 1,
         limit: queryDto.limit || 10,
@@ -269,8 +296,12 @@ export class ServicesService extends BaseService {
     return service;
   }
 
-  async findActiveServices(): Promise<Service[]> {
-    return this.db.service.findMany({
+  async findActiveServices(
+    currentUserId?: string,
+  ): Promise<
+    (Service & { isOwnService?: boolean; currentUserResponded?: boolean })[]
+  > {
+    const items = await this.db.service.findMany({
       where: { status: ServiceStatus.ACTIVE },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -300,6 +331,25 @@ export class ServicesService extends BaseService {
         },
       },
     });
+    if (currentUserId != null) {
+      const serviceIdsWithMyResponse = new Set(
+        (
+          await this.db.serviceResponse.findMany({
+            where: {
+              studentId: currentUserId,
+              serviceId: { in: items.map((i) => i.id) },
+            },
+            select: { serviceId: true },
+          })
+        ).map((r) => r.serviceId),
+      );
+      return items.map((item) => ({
+        ...item,
+        isOwnService: item.tutorId === currentUserId,
+        currentUserResponded: serviceIdsWithMyResponse.has(item.id),
+      }));
+    }
+    return items;
   }
 
   async findByTutor(tutorId: string): Promise<Service[]> {

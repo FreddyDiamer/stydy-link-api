@@ -7,6 +7,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -68,6 +69,10 @@ model User {
   // System fields
   balance      Int      @default(0) // в копейках
   lastActivity DateTime @default(now())
+
+  // Notification settings
+  telegramNotificationsEnabled Boolean @default(true)
+  notificationPreferences     Json?   // { onResponse, onDeal, onReview } for future use
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -347,6 +352,7 @@ model Review {
   targetId String // кому оставлен отзыв
   rating   Int // 1-5
   comment  String?
+  reply    String? // ответ репетитора на отзыв
 
   // Роль цели отзыва (для правильного обновления статистики)
   targetRole UserRole // TUTOR или STUDENT 

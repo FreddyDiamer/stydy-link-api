@@ -14,6 +14,7 @@ import { ReviewsService } from './reviews.service';
 import {
   CreateReviewDto,
   UpdateReviewDto,
+  SetReviewReplyDto,
   ReviewResponseDto,
   ReviewFilterDto,
 } from './dto/review.dto';
@@ -73,11 +74,15 @@ export class ReviewsController {
   @Get('about-me')
   @ApiOperation({
     summary: 'Получить отзывы обо мне',
-    description: 'Получить список отзывов о текущем пользователе',
+    description:
+      'Получить список отзывов о текущем пользователе (опционально по роли: TUTOR | STUDENT)',
   })
   @ApiSuccessResponse(ReviewResponseDto)
-  async findAboutMe(@CurrentUser() user: User) {
-    const reviews = await this.reviewsService.findByTarget(user.id);
+  async findAboutMe(
+    @CurrentUser() user: User,
+    @Query('targetRole') targetRole?: 'TUTOR' | 'STUDENT',
+  ) {
+    const reviews = await this.reviewsService.findByTarget(user.id, targetRole);
     return {
       items: reviews,
       total: reviews.length,
@@ -88,11 +93,14 @@ export class ReviewsController {
   @ApiOperation({
     summary: 'Получить статистику отзывов пользователя',
     description:
-      'Получить детальную статистику отзывов и рейтингов пользователя',
+      'Получить детальную статистику отзывов и рейтингов (опционально по роли: TUTOR | STUDENT)',
   })
   @ApiSuccessResponse()
-  async getTargetStats(@Param('targetId', ParseUUIDPipe) targetId: string) {
-    return this.reviewsService.getTargetStats(targetId);
+  async getTargetStats(
+    @Param('targetId', ParseUUIDPipe) targetId: string,
+    @Query('targetRole') targetRole?: 'TUTOR' | 'STUDENT',
+  ) {
+    return this.reviewsService.getTargetStats(targetId, targetRole);
   }
 
   @Get('top-rated/:role')
@@ -111,15 +119,32 @@ export class ReviewsController {
   @Get('by-target/:targetId')
   @ApiOperation({
     summary: 'Получить отзывы о пользователе',
-    description: 'Получить все отзывы о конкретном пользователе',
+    description:
+      'Получить отзывы о пользователе (опционально по роли: TUTOR | STUDENT)',
   })
   @ApiSuccessResponse(ReviewResponseDto)
-  async findByTarget(@Param('targetId', ParseUUIDPipe) targetId: string) {
-    const reviews = await this.reviewsService.findByTarget(targetId);
+  async findByTarget(
+    @Param('targetId', ParseUUIDPipe) targetId: string,
+    @Query('targetRole') targetRole?: 'TUTOR' | 'STUDENT',
+  ) {
+    const reviews = await this.reviewsService.findByTarget(
+      targetId,
+      targetRole,
+    );
     return {
       items: reviews,
       total: reviews.length,
     };
+  }
+
+  @Get('deal/:dealId')
+  @ApiOperation({
+    summary: 'Получить отзывы по сделке',
+    description: 'Получить все отзывы по конкретной сделке',
+  })
+  @ApiSuccessResponse(ReviewResponseDto)
+  async findByDeal(@Param('dealId', ParseUUIDPipe) dealId: string) {
+    return this.reviewsService.findByDeal(dealId);
   }
 
   @Get(':id')
@@ -149,6 +174,21 @@ export class ReviewsController {
       throw new Error('Можно редактировать только свои отзывы');
     }
     return this.reviewsService.update(id, updateReviewDto);
+  }
+
+  @Patch(':id/reply')
+  @ApiOperation({
+    summary: 'Ответить на отзыв / изменить / удалить ответ',
+    description:
+      'Репетитор может оставить ответ на отзыв, изменить или удалить его (reply: null)',
+  })
+  @ApiSuccessResponse(ReviewResponseDto)
+  async setReply(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetReviewReplyDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.reviewsService.setReply(id, user.id, dto);
   }
 
   @Delete(':id')

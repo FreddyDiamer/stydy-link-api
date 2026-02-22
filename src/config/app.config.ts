@@ -5,6 +5,7 @@ const appConfigSchema = z.object({
   port: z.number().int().positive().default(3000),
   nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
   telegramBotToken: z.string().optional(),
+  frontendBaseUrl: z.string().url().optional(),
 });
 
 export const appConfig = registerAs('app', () => {
@@ -12,6 +13,7 @@ export const appConfig = registerAs('app', () => {
     port: parseInt(process.env.PORT ?? '3000', 10),
     nodeEnv: process.env.NODE_ENV as 'development' | 'production' | 'test',
     telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
+    frontendBaseUrl: process.env.FRONTEND_BASE_URL,
   };
 
   const validatedConfig = appConfigSchema.parse(config);

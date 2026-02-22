@@ -82,6 +82,22 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsOptional()
   @IsString()
   groupId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Enable Telegram notifications',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  telegramNotificationsEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Per-type notification preferences (e.g. onResponse, onDeal, onReview)',
+    example: { onResponse: true, onDeal: true, onReview: true },
+  })
+  @IsOptional()
+  notificationPreferences?: Record<string, boolean>;
 }
 
 export class UserFilterDto {
@@ -91,11 +107,11 @@ export class UserFilterDto {
   })
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
       return value === 'true';
     }
-    return value;
+    return value as boolean | undefined;
   })
   isActive?: boolean;
 
@@ -105,11 +121,11 @@ export class UserFilterDto {
   })
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
       return value === 'true';
     }
-    return value;
+    return value as boolean | undefined;
   })
   isVerified?: boolean;
 
@@ -127,7 +143,9 @@ export class UserFilterDto {
     maximum: 5,
   })
   @IsOptional()
-  @Transform(({ value }) => parseFloat(value))
+  @Transform(({ value }: { value: unknown }) =>
+    value != null && value !== '' ? Number(value) : undefined,
+  )
   @IsNumber()
   @Min(0)
   @Max(5)
@@ -170,6 +188,12 @@ export class UserResponseDto {
 
   @ApiProperty()
   lastActivity: Date;
+
+  @ApiPropertyOptional()
+  telegramNotificationsEnabled?: boolean;
+
+  @ApiPropertyOptional()
+  notificationPreferences?: Record<string, boolean>;
 
   @ApiProperty()
   createdAt: Date;
