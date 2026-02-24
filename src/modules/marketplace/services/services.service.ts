@@ -71,9 +71,8 @@ export class ServicesService extends BaseService {
       const service = await this.db.service.create({
         data: {
           ...createServiceDto,
-          deadline: createServiceDto.deadline
-            ? new Date(createServiceDto.deadline)
-            : undefined,
+          lessonsCount: createServiceDto.lessonsCount,
+          lessonDurationMinutes: createServiceDto.lessonDurationMinutes,
           tutorId,
         },
         include: {
@@ -152,6 +151,9 @@ export class ServicesService extends BaseService {
 
       if (queryDto.status) {
         where.status = queryDto.status;
+      } else {
+        // По умолчанию для витрины показываем только активные услуги
+        where.status = ServiceStatus.ACTIVE;
       }
 
       // Фильтр по цене
@@ -162,17 +164,6 @@ export class ServicesService extends BaseService {
         }
         if (queryDto.maxPrice !== undefined) {
           where.price.lte = queryDto.maxPrice;
-        }
-      }
-
-      // Фильтр по дедлайну
-      if (queryDto.deadlineAfter || queryDto.deadlineBefore) {
-        where.deadline = {};
-        if (queryDto.deadlineAfter) {
-          where.deadline.gte = new Date(queryDto.deadlineAfter);
-        }
-        if (queryDto.deadlineBefore) {
-          where.deadline.lte = new Date(queryDto.deadlineBefore);
         }
       }
 
@@ -357,6 +348,12 @@ export class ServicesService extends BaseService {
       where: { tutorId },
       orderBy: { createdAt: 'desc' },
       include: {
+        responses: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
         subject: {
           select: {
             id: true,
@@ -416,9 +413,12 @@ export class ServicesService extends BaseService {
         where: { id },
         data: {
           ...updateServiceDto,
-          deadline: updateServiceDto.deadline
-            ? new Date(updateServiceDto.deadline)
-            : undefined,
+          ...(updateServiceDto.lessonsCount !== undefined && {
+            lessonsCount: updateServiceDto.lessonsCount,
+          }),
+          ...(updateServiceDto.lessonDurationMinutes !== undefined && {
+            lessonDurationMinutes: updateServiceDto.lessonDurationMinutes,
+          }),
           updatedAt: new Date(),
         },
         include: {

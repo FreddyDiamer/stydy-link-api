@@ -361,6 +361,29 @@ export class ServiceResponsesService extends BaseService {
       where: { serviceId },
       orderBy: { createdAt: 'desc' },
       include: {
+        service: {
+          include: {
+            tutor: {
+              select: {
+                id: true,
+                name: true,
+                telegramUsername: true,
+              },
+            },
+            subject: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            teacher: {
+              select: {
+                id: true,
+                fullName: true,
+              },
+            },
+          },
+        },
         student: {
           select: {
             id: true,

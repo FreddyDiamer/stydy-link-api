@@ -224,8 +224,10 @@ model Service {
   description String?
   status      ServiceStatus @default(ACTIVE)
 
-  // Срок выполнения (для услуг с временными рамками)
-  deadline DateTime?
+  // Количество занятий для подготовки студента
+  lessonsCount          Int    @default(1)
+  // Длительность одного занятия в минутах
+  lessonDurationMinutes Int    @default(60)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
