@@ -9,7 +9,7 @@ import {
   Min,
   Max,
 } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 // Вместо enum ResponseStatus используем string union type
 export type ResponseStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
@@ -59,6 +59,24 @@ export class CreateServiceResponseDto {
   @IsOptional()
   @IsDateString()
   proposedDeadline?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Тип дедлайна, выбранный студентом (today/week/month/custom). Нужен, чтобы репетитор видел протяженность (например, "в течение месяца").',
+    example: 'month',
+  })
+  @IsOptional()
+  @IsString()
+  proposedDeadlineType?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Тип бюджета/ценового ожидания (service-price/flexible/lower/higher). Нужен, чтобы репетитор видел, как студент относится к цене.',
+    example: 'lower',
+  })
+  @IsOptional()
+  @IsString()
+  budgetType?: string;
 }
 
 export class UpdateServiceResponseDto extends PartialType(
@@ -176,6 +194,20 @@ export class ServiceResponseResponseDto {
     example: '2024-06-01T10:00:00.000Z',
   })
   proposedDeadline?: Date;
+
+  @ApiPropertyOptional({
+    description:
+      'Тип дедлайна, выбранный студентом (today/week/month/custom). Используется для показа протяженности вроде "в течение месяца".',
+    example: 'month',
+  })
+  proposedDeadlineType?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Тип бюджета/ценового ожидания (service-price/flexible/lower/higher).',
+    example: 'lower',
+  })
+  budgetType?: string;
 
   @ApiProperty({
     description: 'Дата создания отклика',

@@ -86,6 +86,11 @@ export class ServiceResponsesService extends BaseService {
           serviceId: createServiceResponseDto.serviceId,
           message: createServiceResponseDto.message,
           price: createServiceResponseDto.price,
+          proposedDeadline: createServiceResponseDto.proposedDeadline
+            ? new Date(createServiceResponseDto.proposedDeadline)
+            : undefined,
+          proposedDeadlineType: createServiceResponseDto.proposedDeadlineType,
+          budgetType: createServiceResponseDto.budgetType,
           status: 'PENDING',
         },
         include: {
@@ -439,11 +444,21 @@ export class ServiceResponsesService extends BaseService {
           ...(updateServiceResponseDto.price !== undefined && {
             price: updateServiceResponseDto.price,
           }),
+          ...(updateServiceResponseDto.proposedDeadline !== undefined && {
+            proposedDeadline: updateServiceResponseDto.proposedDeadline
+              ? new Date(updateServiceResponseDto.proposedDeadline)
+              : null,
+          }),
+          ...(updateServiceResponseDto.proposedDeadlineType !== undefined && {
+            proposedDeadlineType: updateServiceResponseDto.proposedDeadlineType,
+          }),
+          ...(updateServiceResponseDto.budgetType !== undefined && {
+            budgetType: updateServiceResponseDto.budgetType,
+          }),
           ...(updateServiceResponseDto.status && {
             status:
               updateServiceResponseDto.status as Prisma.ServiceResponseUpdateInput['status'],
           }),
-          // TODO: добавить proposedDeadline после обновления Prisma client
           updatedAt: new Date(),
         },
         include: {

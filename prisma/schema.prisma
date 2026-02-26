@@ -308,6 +308,10 @@ model ServiceResponse {
   message          String? // сообщение при отклике
   price            Int? // предложенная цена студента
   proposedDeadline DateTime? // предложенная дата выполнения
+  // Тип дедлайна, который выбрал студент (today/week/month/custom)
+  proposedDeadlineType String?
+  // Тип бюджета/ценового ожидания (service-price/flexible/lower/higher)
+  budgetType           String?
   status           ResponseStatus @default(PENDING)
 
   createdAt DateTime @default(now())
