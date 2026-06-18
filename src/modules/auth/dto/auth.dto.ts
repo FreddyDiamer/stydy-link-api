@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export interface TelegramUser {
   id: number;
@@ -40,6 +40,42 @@ export class TelegramAuthDto {
   @IsString()
   @IsNotEmpty()
   initData: string;
+}
+
+export class DevLoginDto {
+  @ApiPropertyOptional({
+    description:
+      'ID существующего пользователя для входа. Если указан — вход выполняется под этим пользователем (остальные поля игнорируются).',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsString()
+  @IsOptional()
+  userId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Telegram ID. Пользователь создаётся/находится по этому ID. По умолчанию используется тестовый dev-пользователь.',
+    example: '852915881',
+  })
+  @IsString()
+  @IsOptional()
+  telegramId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Telegram username для создаваемого dev-пользователя',
+    example: 'dev_user',
+  })
+  @IsString()
+  @IsOptional()
+  telegramUsername?: string;
+
+  @ApiPropertyOptional({
+    description: 'Имя для создаваемого dev-пользователя',
+    example: 'Dev User',
+  })
+  @IsString()
+  @IsOptional()
+  name?: string;
 }
 
 export class AuthResponseDto {

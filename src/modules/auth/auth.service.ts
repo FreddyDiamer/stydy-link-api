@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
@@ -8,6 +8,7 @@ import {
   TelegramAuthDto,
   AuthResponseDto,
   TelegramInitData,
+  DevLoginDto,
 } from './dto/auth.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import * as crypto from 'crypto';
@@ -89,6 +90,75 @@ export class AuthService {
         throw error;
       }
       throw new BusinessException('Authentication failed');
+    }
+  }
+
+  /**
+   * Веб-авторизация для разработки без Telegram.
+   * Полностью отключена в production — позволяет войти под существующим
+   * пользователем или создать/получить тестового dev-пользователя.
+   */
+  async devLogin(dto: DevLoginDto): Promise<AuthResponseDto> {
+    this.ensureDevEnvironment();
+
+    let user: User | null = null;
+
+    if (dto.userId) {
+      // Вход под конкретным существующим пользователем
+      user = await this.db.user.findUnique({
+        where: { id: dto.userId },
+        include: { group: true },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User', dto.userId);
+      }
+    } else {
+      // Создаём/находим тестового пользователя по telegramId
+      const telegramId = dto.telegramId ?? 'dev-user';
+      const telegramUsername = dto.telegramUsername ?? 'dev_user';
+      const name = dto.name ?? 'Dev User';
+
+      user = await this.db.user.upsert({
+        where: { telegramId },
+        update: { lastActivity: new Date() },
+        create: { telegramId, telegramUsername, name },
+        include: { group: true },
+      });
+    }
+
+    const accessToken = await this.generateAccessToken(user);
+
+    return { accessToken, user };
+  }
+
+  /**
+   * Список пользователей для выбора при веб-входе в режиме разработки.
+   * Полностью отключён в production.
+   */
+  async listDevUsers(): Promise<
+    Pick<User, 'id' | 'telegramId' | 'telegramUsername' | 'name'>[]
+  > {
+    this.ensureDevEnvironment();
+
+    return this.db.user.findMany({
+      select: {
+        id: true,
+        telegramId: true,
+        telegramUsername: true,
+        name: true,
+      },
+      orderBy: { lastActivity: 'desc' },
+      take: 100,
+    });
+  }
+
+  private ensureDevEnvironment(): void {
+    const nodeEnv = this.configService.get<string>('app.nodeEnv');
+    if (nodeEnv === 'production') {
+      throw new ForbiddenException(
+        'Web auth is disabled in production environment',
+      );
     }
   }
 
