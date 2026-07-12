@@ -45,8 +45,11 @@ export class ServicesController {
     description: 'Получить список услуг репетиторов с фильтрацией и пагинацией',
   })
   @ApiSuccessResponse(ServiceResponseDto)
-  async findAll(@Query() queryDto: ServiceQueryDto) {
-    return this.servicesService.findAll(queryDto);
+  async findAll(
+    @Query() queryDto: ServiceQueryDto,
+    @CurrentUser() user?: User,
+  ) {
+    return this.servicesService.findAll(queryDto, user?.id);
   }
 
   @Get('active')
@@ -55,8 +58,8 @@ export class ServicesController {
     description: 'Получить список активных услуг для студентов',
   })
   @ApiSuccessResponse(ServiceResponseDto)
-  async findActive() {
-    const services = await this.servicesService.findActiveServices();
+  async findActive(@CurrentUser() user?: User) {
+    const services = await this.servicesService.findActiveServices(user?.id);
     return {
       items: services,
       total: services.length,

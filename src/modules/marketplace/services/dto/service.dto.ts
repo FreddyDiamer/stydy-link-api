@@ -5,7 +5,6 @@ import {
   IsNumber,
   IsUUID,
   IsEnum,
-  IsDateString,
   Min,
   Max,
   IsInt,
@@ -51,13 +50,27 @@ export class CreateServiceDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({
-    description: 'Крайний срок выполнения услуги',
-    example: '2024-06-01T10:00:00.000Z',
+  @ApiProperty({
+    description: 'Количество занятий для подготовки студента',
+    example: 10,
+    minimum: 1,
+    maximum: 200,
   })
-  @IsOptional()
-  @IsDateString()
-  deadline?: string;
+  @IsInt()
+  @Min(1, { message: 'Минимум 1 занятие' })
+  @Max(200, { message: 'Максимум 200 занятий' })
+  lessonsCount: number;
+
+  @ApiProperty({
+    description: 'Длительность одного занятия в минутах',
+    example: 60,
+    minimum: 15,
+    maximum: 180,
+  })
+  @IsInt()
+  @Min(15, { message: 'Минимум 15 минут' })
+  @Max(180, { message: 'Максимум 180 минут' })
+  lessonDurationMinutes: number;
 
   @ApiPropertyOptional({
     description: 'Статус услуги',
@@ -138,22 +151,6 @@ export class ServiceFilterDto {
   @IsOptional()
   @IsString()
   search?: string;
-
-  @ApiPropertyOptional({
-    description: 'Услуги с дедлайном до указанной даты',
-    example: '2024-06-01T00:00:00.000Z',
-  })
-  @IsOptional()
-  @IsDateString()
-  deadlineBefore?: string;
-
-  @ApiPropertyOptional({
-    description: 'Услуги с дедлайном после указанной даты',
-    example: '2024-01-01T00:00:00.000Z',
-  })
-  @IsOptional()
-  @IsDateString()
-  deadlineAfter?: string;
 }
 
 export class ServiceQueryDto extends ServiceFilterDto {
@@ -230,11 +227,17 @@ export class ServiceResponseDto {
   })
   status: ServiceStatus;
 
-  @ApiPropertyOptional({
-    description: 'Крайний срок выполнения',
-    example: '2024-06-01T10:00:00.000Z',
+  @ApiProperty({
+    description: 'Количество занятий для подготовки студента',
+    example: 10,
   })
-  deadline?: Date;
+  lessonsCount: number;
+
+  @ApiProperty({
+    description: 'Длительность одного занятия в минутах',
+    example: 60,
+  })
+  lessonDurationMinutes: number;
 
   @ApiProperty({
     description: 'Дата создания услуги',

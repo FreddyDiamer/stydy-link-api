@@ -25,8 +25,15 @@ export class AuthService {
     try {
       // Валидируем initData строку
       const botToken = this.configService.get<string>('app.telegramBotToken');
+      const nodeEnv = this.configService.get<string>('app.nodeEnv');
+
+      // Пропускаем валидацию для мок-данных в dev режиме
+      const isMockData = this.isMockInitData(authDto.initData);
+      const shouldSkipValidation = nodeEnv === 'development' && isMockData;
+
       if (
         botToken &&
+        !shouldSkipValidation &&
         !this.validateTelegramInitData(authDto.initData, botToken)
       ) {
         throw new BusinessException('Invalid Telegram authentication data');
@@ -165,11 +172,11 @@ export class AuthService {
   private parseInitData(initData: string): TelegramInitData {
     try {
       const params = new URLSearchParams(initData);
-      const result: any = {};
+      const result: Record<string, unknown> = {};
 
       for (const [key, value] of params.entries()) {
         if (key === 'user' || key === 'receiver' || key === 'chat') {
-          result[key] = JSON.parse(decodeURIComponent(value));
+          result[key] = JSON.parse(decodeURIComponent(value)) as unknown;
         } else if (key === 'auth_date' || key === 'can_send_after') {
           result[key] = parseInt(value, 10);
         } else {
@@ -177,10 +184,26 @@ export class AuthService {
         }
       }
 
-      return result as TelegramInitData;
-    } catch (error) {
+      return result as unknown as TelegramInitData;
+    } catch {
       throw new BusinessException('Failed to parse Telegram init data');
     }
+  }
+
+  private isMockInitData(initData: string): boolean {
+    // Проверяем известные моковые значения hash
+    const mockHashes = ['fashdkah', 'mock', 'test'];
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+
+    if (!hash) {
+      return false;
+    }
+
+    // Проверяем, является ли hash моковым
+    return mockHashes.some((mockHash) =>
+      hash.toLowerCase().includes(mockHash.toLowerCase()),
+    );
   }
 
   private validateTelegramInitData(
@@ -216,7 +239,7 @@ export class AuthService {
         .digest('hex');
 
       return calculatedHash === hash;
-    } catch (error) {
+    } catch {
       return false;
     }
   }

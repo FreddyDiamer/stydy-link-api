@@ -40,6 +40,13 @@ export class RequestResponsesController {
     return this.service.findAll(filter);
   }
 
+  @Get('my')
+  @ApiOperation({ summary: 'Мои отклики на заявки (репетитор)' })
+  @ApiSuccessResponse(RequestResponseResponseDto)
+  findMy(@CurrentUser() user: User) {
+    return this.service.findByTutor(user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Получить отклик по id' })
   @ApiSuccessResponse(RequestResponseResponseDto)
@@ -57,9 +64,30 @@ export class RequestResponsesController {
     return this.service.update(id, dto);
   }
 
+  @Patch(':id/accept')
+  @ApiOperation({ summary: 'Принять отклик (студент)' })
+  @ApiSuccessResponse(RequestResponseResponseDto)
+  accept(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.service.accept(id, user);
+  }
+
+  @Patch(':id/reject')
+  @ApiOperation({ summary: 'Отклонить отклик (студент)' })
+  @ApiSuccessResponse(RequestResponseResponseDto)
+  reject(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.service.reject(id, user);
+  }
+
+  @Patch(':id/cancel')
+  @ApiOperation({ summary: 'Отменить принятый отклик (студент)' })
+  @ApiSuccessResponse(RequestResponseResponseDto)
+  cancel(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.service.cancel(id, user);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Удалить отклик' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.service.remove(id, user);
   }
 }

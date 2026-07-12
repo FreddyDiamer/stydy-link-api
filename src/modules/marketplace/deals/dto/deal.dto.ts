@@ -7,9 +7,11 @@ import {
   IsNumber,
   Min,
   Max,
+  IsInt,
   IsDateString,
   IsEnum,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export type DealStatus =
   | 'PENDING'
@@ -119,6 +121,51 @@ export class DealFilterDto {
   @IsNumber()
   @Min(0)
   maxPrice?: number;
+}
+
+/** Query DTO для GET /deals: пагинация + фильтр в одном объекте (избегаем forbidNonWhitelisted при двух @Query()) */
+export class DealListQueryDto extends DealFilterDto {
+  @ApiPropertyOptional({
+    description: 'Номер страницы',
+    minimum: 1,
+    default: 1,
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value !== undefined && value !== null && value !== ''
+      ? parseInt(
+          typeof value === 'string' || typeof value === 'number'
+            ? String(value)
+            : '1',
+          10,
+        )
+      : 1,
+  )
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    description: 'Размер страницы',
+    minimum: 1,
+    maximum: 100,
+    default: 10,
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value !== undefined && value !== null && value !== ''
+      ? parseInt(
+          typeof value === 'string' || typeof value === 'number'
+            ? String(value)
+            : '10',
+          10,
+        )
+      : 10,
+  )
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 10;
 }
 
 export class DealResponseDto {

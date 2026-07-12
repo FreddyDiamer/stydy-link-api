@@ -6,13 +6,7 @@ import {
   UpdateRequestDto,
   RequestFilterDto,
 } from './dto/request.dto';
-import {
-  BaseService,
-  BusinessException,
-  NotFoundException,
-  PaginatedResult,
-  PaginationDto,
-} from '@common';
+import { BaseService, BusinessException, NotFoundException } from '@common';
 
 @Injectable()
 export class RequestsService extends BaseService {
@@ -134,7 +128,10 @@ export class RequestsService extends BaseService {
     }
   }
 
-  async findAll(filterDto: RequestFilterDto): Promise<Request[]> {
+  async findAll(
+    filterDto: RequestFilterDto,
+    currentUserId?: string,
+  ): Promise<(Request & { currentUserResponded?: boolean })[]> {
     try {
       const where: Prisma.RequestWhereInput = {};
 
@@ -173,7 +170,7 @@ export class RequestsService extends BaseService {
         };
       }
 
-      const [items, total] = await Promise.all([
+      const [items, _total] = await Promise.all([
         this.db.request.findMany({
           where,
           orderBy: { createdAt: 'desc' },
@@ -216,7 +213,15 @@ export class RequestsService extends BaseService {
         }),
         this.db.request.count({ where }),
       ]);
+      void _total;
 
+      if (currentUserId) {
+        return items.map((item) => ({
+          ...item,
+          currentUserResponded:
+            item.responses?.some((r) => r.tutor?.id === currentUserId) ?? false,
+        }));
+      }
       return items;
     } catch (error) {
       this.logError('Ошибка получения списка заявок', error as Error, {
@@ -275,8 +280,10 @@ export class RequestsService extends BaseService {
     return request;
   }
 
-  async findOpenRequests(): Promise<Request[]> {
-    return this.db.request.findMany({
+  async findOpenRequests(
+    currentUserId?: string,
+  ): Promise<(Request & { currentUserResponded?: boolean })[]> {
+    const items = await this.db.request.findMany({
       where: {
         deadline: {
           gte: new Date(),
@@ -319,6 +326,14 @@ export class RequestsService extends BaseService {
         },
       },
     });
+    if (currentUserId) {
+      return items.map((item) => ({
+        ...item,
+        currentUserResponded:
+          item.responses?.some((r) => r.tutor?.id === currentUserId) ?? false,
+      }));
+    }
+    return items;
   }
 
   async findByStudent(studentId: string): Promise<Request[]> {

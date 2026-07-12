@@ -7,6 +7,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -68,6 +69,10 @@ model User {
   // System fields
   balance      Int      @default(0) // в копейках
   lastActivity DateTime @default(now())
+
+  // Notification settings
+  telegramNotificationsEnabled Boolean @default(true)
+  notificationPreferences     Json?   // { onResponse, onDeal, onReview } for future use
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -219,8 +224,10 @@ model Service {
   description String?
   status      ServiceStatus @default(ACTIVE)
 
-  // Срок выполнения (для услуг с временными рамками)
-  deadline DateTime?
+  // Количество занятий для подготовки студента
+  lessonsCount          Int    @default(1)
+  // Длительность одного занятия в минутах
+  lessonDurationMinutes Int    @default(60)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -301,6 +308,10 @@ model ServiceResponse {
   message          String? // сообщение при отклике
   price            Int? // предложенная цена студента
   proposedDeadline DateTime? // предложенная дата выполнения
+  // Тип дедлайна, который выбрал студент (today/week/month/custom)
+  proposedDeadlineType String?
+  // Тип бюджета/ценового ожидания (service-price/flexible/lower/higher)
+  budgetType           String?
   status           ResponseStatus @default(PENDING)
 
   createdAt DateTime @default(now())
@@ -347,6 +358,7 @@ model Review {
   targetId String // кому оставлен отзыв
   rating   Int // 1-5
   comment  String?
+  reply    String? // ответ репетитора на отзыв
 
   // Роль цели отзыва (для правильного обновления статистики)
   targetRole UserRole // TUTOR или STUDENT 

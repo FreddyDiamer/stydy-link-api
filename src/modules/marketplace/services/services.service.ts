@@ -71,9 +71,8 @@ export class ServicesService extends BaseService {
       const service = await this.db.service.create({
         data: {
           ...createServiceDto,
-          deadline: createServiceDto.deadline
-            ? new Date(createServiceDto.deadline)
-            : undefined,
+          lessonsCount: createServiceDto.lessonsCount,
+          lessonDurationMinutes: createServiceDto.lessonDurationMinutes,
           tutorId,
         },
         include: {
@@ -126,7 +125,14 @@ export class ServicesService extends BaseService {
     }
   }
 
-  async findAll(queryDto: ServiceQueryDto): Promise<PaginatedResult<Service>> {
+  async findAll(
+    queryDto: ServiceQueryDto,
+    currentUserId?: string,
+  ): Promise<
+    PaginatedResult<
+      Service & { isOwnService?: boolean; currentUserResponded?: boolean }
+    >
+  > {
     try {
       const where: Prisma.ServiceWhereInput = {};
 
@@ -145,6 +151,9 @@ export class ServicesService extends BaseService {
 
       if (queryDto.status) {
         where.status = queryDto.status;
+      } else {
+        // По умолчанию для витрины показываем только активные услуги
+        where.status = ServiceStatus.ACTIVE;
       }
 
       // Фильтр по цене
@@ -155,17 +164,6 @@ export class ServicesService extends BaseService {
         }
         if (queryDto.maxPrice !== undefined) {
           where.price.lte = queryDto.maxPrice;
-        }
-      }
-
-      // Фильтр по дедлайну
-      if (queryDto.deadlineAfter || queryDto.deadlineBefore) {
-        where.deadline = {};
-        if (queryDto.deadlineAfter) {
-          where.deadline.gte = new Date(queryDto.deadlineAfter);
-        }
-        if (queryDto.deadlineBefore) {
-          where.deadline.lte = new Date(queryDto.deadlineBefore);
         }
       }
 
@@ -214,8 +212,28 @@ export class ServicesService extends BaseService {
         this.db.service.count({ where }),
       ]);
 
+      let resultItems = items;
+      if (currentUserId != null) {
+        const serviceIdsWithMyResponse = new Set(
+          (
+            await this.db.serviceResponse.findMany({
+              where: {
+                studentId: currentUserId,
+                serviceId: { in: items.map((i) => i.id) },
+              },
+              select: { serviceId: true },
+            })
+          ).map((r) => r.serviceId),
+        );
+        resultItems = items.map((item) => ({
+          ...item,
+          isOwnService: item.tutorId === currentUserId,
+          currentUserResponded: serviceIdsWithMyResponse.has(item.id),
+        }));
+      }
+
       return {
-        items,
+        items: resultItems,
         total,
         page: queryDto.page || 1,
         limit: queryDto.limit || 10,
@@ -269,8 +287,12 @@ export class ServicesService extends BaseService {
     return service;
   }
 
-  async findActiveServices(): Promise<Service[]> {
-    return this.db.service.findMany({
+  async findActiveServices(
+    currentUserId?: string,
+  ): Promise<
+    (Service & { isOwnService?: boolean; currentUserResponded?: boolean })[]
+  > {
+    const items = await this.db.service.findMany({
       where: { status: ServiceStatus.ACTIVE },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -300,6 +322,25 @@ export class ServicesService extends BaseService {
         },
       },
     });
+    if (currentUserId != null) {
+      const serviceIdsWithMyResponse = new Set(
+        (
+          await this.db.serviceResponse.findMany({
+            where: {
+              studentId: currentUserId,
+              serviceId: { in: items.map((i) => i.id) },
+            },
+            select: { serviceId: true },
+          })
+        ).map((r) => r.serviceId),
+      );
+      return items.map((item) => ({
+        ...item,
+        isOwnService: item.tutorId === currentUserId,
+        currentUserResponded: serviceIdsWithMyResponse.has(item.id),
+      }));
+    }
+    return items;
   }
 
   async findByTutor(tutorId: string): Promise<Service[]> {
@@ -307,6 +348,12 @@ export class ServicesService extends BaseService {
       where: { tutorId },
       orderBy: { createdAt: 'desc' },
       include: {
+        responses: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
         subject: {
           select: {
             id: true,
@@ -366,9 +413,12 @@ export class ServicesService extends BaseService {
         where: { id },
         data: {
           ...updateServiceDto,
-          deadline: updateServiceDto.deadline
-            ? new Date(updateServiceDto.deadline)
-            : undefined,
+          ...(updateServiceDto.lessonsCount !== undefined && {
+            lessonsCount: updateServiceDto.lessonsCount,
+          }),
+          ...(updateServiceDto.lessonDurationMinutes !== undefined && {
+            lessonDurationMinutes: updateServiceDto.lessonDurationMinutes,
+          }),
           updatedAt: new Date(),
         },
         include: {
