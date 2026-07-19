@@ -1,0 +1,87 @@
+# Architecture
+
+How the NestJS application is wired: module layout, the request lifecycle, cross-cutting behavior, configuration, and deployment.
+
+## Key files
+
+| File                               | Purpose                                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| `src/main.ts`                      | Bootstrap: global `/api` prefix, `ValidationPipe`, `GlobalExceptionFilter`, CORS, Swagger    |
+| `src/app.module.ts`                | Root module: registers all feature modules, global `JwtAuthGuard` and `TransformInterceptor` |
+| `src/common/index.ts`              | Barrel for the shared layer, imported everywhere as `@common`                                |
+| `src/config/`                      | `app.config.ts`, `database.config.ts`, `jwt.config.ts` — zod-validated `registerAs` configs  |
+| `src/database/database.service.ts` | `DatabaseService extends PrismaClient` — the single DB access point                          |
+
+## Module layout
+
+Feature-modular NestJS. Each feature under `src/modules/` is a self-contained module with `*.controller.ts`, `*.service.ts`, `*.module.ts`, and `dto/`:
+
+```
+src/modules/
+  auth/           Telegram login, JWT strategy, dev login
+  users/          User CRUD and profile
+  tutors/         Read-only tutor profile aggregation
+  education/      subjects/ teachers/ teacher-subjects/ groups/ (sub-modules)
+  marketplace/    services/ requests/ service-responses/ request-responses/ deals/
+  reviews/        Reviews on completed deals
+  notifications/  Telegram bot + notification senders (no controller)
+  parser/         University-data sync in a worker thread
+```
+
+Shared code lives in `src/common/` (decorators, guards, pipes, filters, interceptors, exceptions, DTOs, `BaseService`) and is imported via the `@common` path alias (`tsconfig.json`).
+
+## Request lifecycle
+
+Every HTTP request passes through, in order:
+
+1. **`JwtAuthGuard`** (global `APP_GUARD`) — requires a Bearer JWT unless the handler or controller is marked `@Public()`. On success, `request.user` is the full Prisma `User` (loaded by `src/modules/auth/strategies/jwt.strategy.ts`); read it with `@CurrentUser()`.
+2. **`ValidationPipe`** (global, in `main.ts`) — `transform` + `whitelist` + `forbidNonWhitelisted`: unknown body fields are rejected with 400, DTOs are class instances.
+3. **Controller → Service** — controllers stay thin (routing, ownership checks, Swagger decorators); business logic and Prisma queries live in services.
+4. **`TransformInterceptor`** (global `APP_INTERCEPTOR`) — wraps every successful response:
+
+```json
+{
+  "data": {},
+  "message": "Operation successful",
+  "success": true,
+  "timestamp": "..."
+}
+```
+
+5. **`GlobalExceptionFilter`** — converts `BusinessException` subclasses and `HttpException`s into a standard error shape (`statusCode`, `error`, `message`, `path`, `timestamp`); unexpected errors become 500 and are logged with the request context.
+
+## Configuration
+
+`ConfigModule.forRoot({ isGlobal: true })` loads three `registerAs` configs, each validated with zod at startup — invalid or missing values crash the boot:
+
+- `app.config.ts` — `PORT`, `NODE_ENV`, `TELEGRAM_BOT_TOKEN` (**required in production**, boot fails without it), `FRONTEND_BASE_URL`
+- `database.config.ts` — `DATABASE_URL` (falls back to assembling one from `DB_HOST`/`DB_USER`/... parts)
+- `jwt.config.ts` — `JWT_SECRET` (min 32 chars, enforced), `JWT_EXPIRES_IN` (default `7d`)
+
+Read values via `configService.get('app.port')` etc. Full variable list: [reference/environment-variables.md](reference/environment-variables.md).
+
+## Database access
+
+`DatabaseService` extends `PrismaClient` directly and connects/disconnects on module init/destroy. Services inject it and call `this.db.user.findUnique(...)` — there is no repository layer. Details: [database-and-migrations.md](database-and-migrations.md).
+
+## Swagger
+
+Non-production only, served at `/api/docs` with `persistAuthorization`. Controllers use `@ApiTags`, `@ApiOperation`, `@ApiBearerAuth` and the project's `@ApiSuccessResponse` decorator (`src/common/decorators/api-response.decorator.ts`). Every new endpoint must carry Swagger decorators — this is a hard rule (see `docs/workflow/hard-rules.md`).
+
+## Deployment
+
+`docker-compose.yml` runs three services:
+
+| Service    | Role                                                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `postgres` | PostgreSQL 15 with a healthcheck                                                                                             |
+| `app`      | Multi-stage Node 18 build (`DockerFile` — note the capital F); entrypoint runs `npx prisma migrate deploy && node dist/main` |
+| `caddy`    | Reverse proxy on 80/443 (`Caddyfile`), proxies to `app:3000`, handles CORS/OPTIONS                                           |
+
+Migrations are applied automatically on container start via `migrate deploy`.
+
+## Common mistakes
+
+- Adding an endpoint and forgetting `@Public()` on routes that must work without a token — the global guard rejects them
+- Returning manually-wrapped `{ success, data }` objects from controllers — `TransformInterceptor` already wraps everything; return the payload itself
+- Reading `process.env` directly in feature code — go through `ConfigService` and the zod-validated configs

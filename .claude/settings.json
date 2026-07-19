@@ -1,0 +1,75 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(pnpm run lint:check*)",
+      "Bash(pnpm run build*)",
+      "Bash(pnpm test*)",
+      "Bash(npx tsc --noEmit*)",
+      "Bash(npx prisma migrate status*)",
+      "Bash(npx prisma validate*)",
+      "Bash(npx prisma generate*)"
+    ],
+    "deny": [
+      "Bash(npx prisma migrate reset*)",
+      "Bash(prisma migrate reset*)",
+      "Bash(npx prisma db push*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "BRANCH=$(git branch --show-current 2>/dev/null || echo 'unknown'); echo \"{\\\"hookSpecificOutput\\\": {\\\"hookEventName\\\": \\\"SessionStart\\\", \\\"additionalContext\\\": \\\"Current branch: '$BRANCH'. Before starting any task, read CLAUDE.md and then docs/workflow/INDEX.md. The workflow zone owns hard rules, task playbooks, and the post-change checklist.\\\"}}\"",
+            "statusMessage": "Loading workflow entry point..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(jq -r '.tool_input.command // \"\"'); if printf '%s' \"$cmd\" | grep -q 'git commit' && printf '%s' \"$cmd\" | grep -qe '--no-verify'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Hard rule: git commit --no-verify запрещён — pre-commit (lint-staged) должен выполняться.\"}}'; fi",
+            "statusMessage": "Checking git command against hard rules..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // .tool_response.filePath // \"\"'); case \"$f\" in *\"/src/\"*.ts) cd \"${CLAUDE_PROJECT_DIR:-.}\" && npx eslint --fix \"$f\" >/dev/null 2>&1 || true ;; esac",
+            "timeout": 30,
+            "statusMessage": "Auto-fixing with ESLint..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); [ \"$(printf '%s' \"$input\" | jq -r '.stop_hook_active // false')\" = \"true\" ] && exit 0; cd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0; git status --porcelain 2>/dev/null | grep -q '\\.ts$' || exit 0; out=$(npx tsc --noEmit -p tsconfig.build.json 2>&1) || { echo 'TypeScript check failed (Stop hook):' >&2; echo \"$out\" >&2; exit 2; }",
+            "timeout": 120,
+            "statusMessage": "Type-checking changed TypeScript..."
+          }
+        ]
+      }
+    ]
+  }
+}
