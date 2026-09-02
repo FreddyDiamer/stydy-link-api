@@ -8,72 +8,22 @@ import {
   Max,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CreateUserDto {
-  @ApiProperty({
-    description: 'Telegram user ID',
-    example: '123456789',
-  })
-  @IsString()
-  @IsNotEmpty()
-  telegramId: string;
-
-  @ApiProperty({
-    description: 'Telegram username',
-    example: 'john_doe',
-  })
-  @IsString()
-  @IsNotEmpty()
-  telegramUsername: string;
-
-  @ApiProperty({
+/**
+ * Поля, которые пользователь может менять у себя сам.
+ * Служебные поля (telegramId, rating, balance, isVerified, isActive)
+ * управляются только бизнес-логикой и недоступны через API.
+ */
+export class UpdateUserDto {
+  @ApiPropertyOptional({
     description: 'User full name',
     example: 'Иван Иванов',
   })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  name: string;
-}
-
-export class UpdateUserDto extends PartialType(CreateUserDto) {
-  @ApiPropertyOptional({
-    description: 'User verification status',
-    example: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  isVerified?: boolean;
-
-  @ApiPropertyOptional({
-    description: 'User active status',
-    example: true,
-  })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-
-  @ApiPropertyOptional({
-    description: 'User rating',
-    minimum: 0,
-    maximum: 5,
-    example: 4.5,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(5)
-  rating?: number;
-
-  @ApiPropertyOptional({
-    description: 'User balance in kopecks',
-    minimum: 0,
-    example: 10000,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  balance?: number;
+  name?: string;
 
   @ApiPropertyOptional({
     description: 'User group ID',
@@ -152,6 +102,7 @@ export class UserFilterDto {
   minRating?: number;
 }
 
+/** Публичный профиль пользователя (без telegramId, balance и настроек нотификаций) */
 export class UserResponseDto {
   @ApiProperty()
   id: string;
@@ -160,22 +111,13 @@ export class UserResponseDto {
   telegramUsername: string;
 
   @ApiProperty()
-  telegramId: string;
-
-  @ApiProperty()
   name: string;
 
-  @ApiProperty()
-  rating: number;
+  @ApiPropertyOptional()
+  description?: string;
 
-  @ApiProperty()
-  balance: number;
-
-  @ApiProperty()
-  isVerified: boolean;
-
-  @ApiProperty()
-  isActive: boolean;
+  @ApiPropertyOptional()
+  avatarUrl?: string;
 
   @ApiPropertyOptional()
   groupId?: string;
@@ -189,17 +131,8 @@ export class UserResponseDto {
   @ApiProperty()
   lastActivity: Date;
 
-  @ApiPropertyOptional()
-  telegramNotificationsEnabled?: boolean;
-
-  @ApiPropertyOptional()
-  notificationPreferences?: Record<string, boolean>;
-
   @ApiProperty()
   createdAt: Date;
-
-  @ApiProperty()
-  updatedAt: Date;
 }
 
 export class UpdateGroupDto {

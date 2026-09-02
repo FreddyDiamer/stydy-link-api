@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { AuthService } from './auth.service';
@@ -11,6 +12,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('telegram')
   @ApiOperation({
     summary: 'Авторизация через Telegram',

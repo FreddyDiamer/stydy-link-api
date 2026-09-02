@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
   IsNotEmpty,
@@ -69,16 +69,6 @@ export class CreateDealDto {
   @IsOptional()
   @IsUUID()
   requestResponseId?: string;
-}
-
-export class UpdateDealDto extends PartialType(CreateDealDto) {
-  @ApiPropertyOptional({
-    description: 'Статус сделки',
-    enum: ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
-  })
-  @IsOptional()
-  @IsEnum(['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'])
-  status?: DealStatus;
 }
 
 export class DealFilterDto {

@@ -1,25 +1,16 @@
 import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
   Param,
-  Delete,
   Query,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { UsersService } from './users.service';
 import {
-  CreateUserDto,
   UpdateUserDto,
   UserResponseDto,
   UserFilterDto,
@@ -33,20 +24,11 @@ import { PaginationDto, CurrentUser, ApiSuccessResponse } from '@common';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
-  @ApiOperation({
-    summary: 'Создать пользователя',
-    description: 'Создание нового пользователя',
-  })
-  @ApiSuccessResponse(UserResponseDto)
-  async create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
-  }
-
   @Get()
   @ApiOperation({
     summary: 'Получить список пользователей',
-    description: 'Получить список пользователей с фильтрацией и пагинацией',
+    description:
+      'Получить список публичных профилей с фильтрацией и пагинацией',
   })
   @ApiSuccessResponse(UserResponseDto)
   async findAll(
@@ -95,21 +77,25 @@ export class UsersController {
   @Get(':id')
   @ApiOperation({
     summary: 'Получить пользователя по ID',
-    description: 'Получить подробную информацию о пользователе',
+    description: 'Получить публичный профиль пользователя',
   })
   @ApiSuccessResponse(UserResponseDto)
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.findOne(id);
+    return this.usersService.findPublicById(id);
   }
 
   @Get(':id/stats')
   @ApiOperation({
     summary: 'Получить статистику пользователя',
-    description: 'Получить статистику по услугам и заявкам пользователя',
+    description:
+      'Получить статистику по услугам и заявкам пользователя (баланс — только для своего профиля)',
   })
   @ApiSuccessResponse()
-  async getStats(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.getUserStats(id);
+  async getStats(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.usersService.getUserStats(id, id === user.id);
   }
 
   @Patch('me')
@@ -122,82 +108,16 @@ export class UsersController {
     @CurrentUser() user: User,
     @Body() updateUserDto: UpdateUserDto,
   ) {
-    // Пользователи не могут менять статус верификации или активности
-    const { isVerified, isActive, ...allowedUpdates } = updateUserDto;
-    return this.usersService.update(user.id, allowedUpdates);
+    return this.usersService.update(user.id, updateUserDto);
   }
 
   @Patch('group')
   @ApiOperation({
     summary: 'Обновить группу пользователя',
-    description: 'Изменить группу пользователя',
+    description: 'Изменить группу текущего пользователя',
   })
   @ApiSuccessResponse(UserResponseDto)
   async updateGroup(@CurrentUser() user: User, @Body() body: UpdateGroupDto) {
     return this.usersService.updateGroup(user.id, body.groupId);
-  }
-
-  @Patch(':id')
-  @ApiOperation({
-    summary: 'Обновить пользователя',
-    description: 'Обновить информацию о пользователе',
-  })
-  @ApiSuccessResponse(UserResponseDto)
-  async update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateUserDto: UpdateUserDto,
-  ) {
-    return this.usersService.update(id, updateUserDto);
-  }
-
-  @Patch(':id/verify')
-  @ApiOperation({
-    summary: 'Верифицировать пользователя',
-    description: 'Установить статус верификации пользователя',
-  })
-  @ApiSuccessResponse(UserResponseDto)
-  async verify(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.verify(id);
-  }
-
-  @Patch(':id/unverify')
-  @ApiOperation({
-    summary: 'Снять верификацию пользователя',
-    description: 'Убрать статус верификации пользователя',
-  })
-  @ApiSuccessResponse(UserResponseDto)
-  async unverify(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.unverify(id);
-  }
-
-  @Patch(':id/deactivate')
-  @ApiOperation({
-    summary: 'Деактивировать пользователя',
-    description: 'Деактивировать аккаунт пользователя',
-  })
-  @ApiSuccessResponse(UserResponseDto)
-  async deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.deactivate(id);
-  }
-
-  @Patch(':id/activate')
-  @ApiOperation({
-    summary: 'Активировать пользователя',
-    description: 'Активировать аккаунт пользователя',
-  })
-  @ApiSuccessResponse(UserResponseDto)
-  async activate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.activate(id);
-  }
-
-  @Delete(':id')
-  @ApiOperation({
-    summary: 'Удалить пользователя',
-    description: 'Полностью удалить пользователя из системы',
-  })
-  @ApiSuccessResponse()
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
-    await this.usersService.remove(id);
-    return { message: 'User deleted successfully' };
   }
 }

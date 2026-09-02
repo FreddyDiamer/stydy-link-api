@@ -1,39 +1,18 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-  ParseUUIDPipe,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SubjectsService } from './subjects.service';
-import {
-  CreateSubjectDto,
-  UpdateSubjectDto,
-  SubjectResponseDto,
-  SubjectFilterDto,
-} from './dto/subject.dto';
+import { SubjectResponseDto, SubjectFilterDto } from './dto/subject.dto';
 import { PaginationDto, ApiSuccessResponse } from '@common';
 
+/**
+ * Справочник предметов только для чтения: данные наполняет парсер
+ * университетского API, ручное редактирование через публичный API закрыто.
+ */
 @ApiTags('Education - Subjects')
 @Controller('education/subjects')
 @ApiBearerAuth()
 export class SubjectsController {
   constructor(private readonly subjectsService: SubjectsService) {}
-
-  @Post()
-  @ApiOperation({
-    summary: 'Создать предмет',
-    description: 'Добавление нового предмета в справочник университета',
-  })
-  @ApiSuccessResponse(SubjectResponseDto)
-  async create(@Body() createSubjectDto: CreateSubjectDto) {
-    return this.subjectsService.create(createSubjectDto);
-  }
 
   @Get()
   @ApiOperation({
@@ -83,55 +62,5 @@ export class SubjectsController {
   @ApiSuccessResponse()
   async getStats(@Param('id', ParseUUIDPipe) id: string) {
     return this.subjectsService.getSubjectStats(id);
-  }
-
-  @Patch(':id')
-  @ApiOperation({
-    summary: 'Обновить предмет',
-    description: 'Обновить информацию о предмете университета',
-  })
-  @ApiSuccessResponse(SubjectResponseDto)
-  async update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateSubjectDto: UpdateSubjectDto,
-  ) {
-    return this.subjectsService.update(id, updateSubjectDto);
-  }
-
-  @Patch(':id/activate')
-  @ApiOperation({
-    summary: 'Активировать предмет',
-    description:
-      'Сделать предмет доступным для выбора при создании услуг и заявок',
-  })
-  @ApiSuccessResponse(SubjectResponseDto)
-  async activate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.subjectsService.activate(id);
-  }
-
-  @Patch(':id/deactivate')
-  @ApiOperation({
-    summary: 'Деактивировать предмет',
-    description:
-      'Скрыть предмет из доступных для выбора (существующие услуги останутся)',
-  })
-  @ApiSuccessResponse(SubjectResponseDto)
-  async deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.subjectsService.deactivate(id);
-  }
-
-  @Delete(':id')
-  @ApiOperation({
-    summary: 'Удалить предмет',
-    description:
-      'Полностью удалить предмет из справочника (только если не используется)',
-  })
-  @ApiSuccessResponse()
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
-    await this.subjectsService.remove(id);
-    return {
-      message: 'Предмет успешно удален из справочника',
-      deletedAt: new Date(),
-    };
   }
 }

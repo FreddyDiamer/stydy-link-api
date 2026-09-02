@@ -1,39 +1,18 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-  ParseUUIDPipe,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TeachersService } from './teachers.service';
-import {
-  CreateTeacherDto,
-  UpdateTeacherDto,
-  TeacherResponseDto,
-  TeacherFilterDto,
-} from './dto/teacher.dto';
+import { TeacherResponseDto, TeacherFilterDto } from './dto/teacher.dto';
 import { PaginationDto, ApiSuccessResponse } from '@common';
 
+/**
+ * Справочник преподавателей только для чтения: данные наполняет парсер
+ * университетского API, ручное редактирование через публичный API закрыто.
+ */
 @ApiTags('Education - Teachers')
 @Controller('education/teachers')
 @ApiBearerAuth()
 export class TeachersController {
   constructor(private readonly teachersService: TeachersService) {}
-
-  @Post()
-  @ApiOperation({
-    summary: 'Создать преподавателя',
-    description: 'Добавление нового преподавателя в справочник университета',
-  })
-  @ApiSuccessResponse(TeacherResponseDto)
-  async create(@Body() createTeacherDto: CreateTeacherDto) {
-    return this.teachersService.create(createTeacherDto);
-  }
 
   @Get()
   @ApiOperation({
@@ -98,33 +77,5 @@ export class TeachersController {
   @ApiSuccessResponse()
   async getStats(@Param('id', ParseUUIDPipe) id: string) {
     return this.teachersService.getTeacherStats(id);
-  }
-
-  @Patch(':id')
-  @ApiOperation({
-    summary: 'Обновить преподавателя',
-    description: 'Обновить информацию о преподавателе университета',
-  })
-  @ApiSuccessResponse(TeacherResponseDto)
-  async update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateTeacherDto: UpdateTeacherDto,
-  ) {
-    return this.teachersService.update(id, updateTeacherDto);
-  }
-
-  @Delete(':id')
-  @ApiOperation({
-    summary: 'Удалить преподавателя',
-    description:
-      'Полностью удалить преподавателя из справочника (только если не используется)',
-  })
-  @ApiSuccessResponse()
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
-    await this.teachersService.remove(id);
-    return {
-      message: 'Преподаватель успешно удален из справочника',
-      deletedAt: new Date(),
-    };
   }
 }

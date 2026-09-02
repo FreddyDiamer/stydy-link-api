@@ -5,7 +5,6 @@ import {
   Body,
   Patch,
   Param,
-  Delete,
   Query,
   ParseUUIDPipe,
 } from '@nestjs/common';
@@ -13,7 +12,6 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DealsService } from './deals.service';
 import {
   CreateDealDto,
-  UpdateDealDto,
   DealResponseDto,
   DealListQueryDto,
   DealFilterDto,
@@ -35,9 +33,9 @@ export class DealsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Список сделок' })
+  @ApiOperation({ summary: 'Список моих сделок' })
   @ApiSuccessResponse(DealResponseDto)
-  findAll(@Query() query: DealListQueryDto) {
+  findAll(@Query() query: DealListQueryDto, @CurrentUser() user: User) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const pagination: PaginationDto = {
@@ -48,14 +46,14 @@ export class DealsController {
     const { page: _page, limit: _limit, ...filter } = query;
     void _page;
     void _limit;
-    return this.service.findAll(pagination, filter as DealFilterDto);
+    return this.service.findAll(pagination, filter as DealFilterDto, user.id);
   }
 
   @Get('my-tutor')
   @ApiOperation({ summary: 'Мои сделки (репетитор)' })
   @ApiSuccessResponse(DealResponseDto)
   findMyTutor(@CurrentUser() user: User, @Query() pagination: PaginationDto) {
-    return this.service.findAll(pagination, { tutorId: user.id });
+    return this.service.findAll(pagination, { tutorId: user.id }, user.id);
   }
 
   @Patch(':id/accept')
@@ -87,22 +85,9 @@ export class DealsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Получить сделку по id' })
+  @ApiOperation({ summary: 'Получить сделку по id (только участник)' })
   @ApiSuccessResponse(DealResponseDto)
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.findOne(id);
-  }
-
-  @Patch(':id')
-  @ApiOperation({ summary: 'Обновить сделку' })
-  @ApiSuccessResponse(DealResponseDto)
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateDealDto) {
-    return this.service.update(id, dto);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Удалить сделку' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.remove(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.service.findOneForUser(id, user.id);
   }
 }

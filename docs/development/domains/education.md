@@ -4,12 +4,12 @@ Reference data the marketplace is built on: subjects, teachers, university group
 
 ## Key files
 
-| File                                      | Purpose                                           |
-| ----------------------------------------- | ------------------------------------------------- |
-| `src/modules/education/subjects/`         | Subject CRUD, activate/deactivate, stats          |
-| `src/modules/education/teachers/`         | Teacher CRUD, teachers-by-subject, stats          |
-| `src/modules/education/teacher-subjects/` | `TeacherSubject` link CRUD, bulk create, toggling |
-| `src/modules/education/groups/`           | Group CRUD (minimal)                              |
+| File                                      | Purpose                                                          |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| `src/modules/education/subjects/`         | Subject reads + stats (API is read-only; writes live in service) |
+| `src/modules/education/teachers/`         | Teacher reads, teachers-by-subject, stats                        |
+| `src/modules/education/teacher-subjects/` | `TeacherSubject` link reads + stats                              |
+| `src/modules/education/groups/`           | Group reads (minimal)                                            |
 
 ## Data model
 
@@ -23,7 +23,7 @@ Reference data the marketplace is built on: subjects, teachers, university group
 
 ## Where the data comes from
 
-The parser ([parser.md](parser.md)) upserts `Group`, `Subject`, `Teacher`, `GroupSubject`, `GroupSubjectTeacher` from the university API, matching on `foreignId`. The CRUD endpoints exist for manual fixes on top of that. `foreignId` and `data` are university-specific — the product currently serves KAI but is designed to onboard other universities on the same codebase, so keep university-specific assumptions inside `data`, not in new columns.
+The parser ([parser.md](parser.md)) upserts `Group`, `Subject`, `Teacher`, `GroupSubject`, `GroupSubjectTeacher` from the university API, matching on `foreignId`. The HTTP API is read-only — write endpoints were removed because without a role system any user could rewrite the catalog; the service-layer create/update/remove methods remain for the parser and future admin tooling. `foreignId` and `data` are university-specific — the product currently serves KAI but is designed to onboard other universities on the same codebase, so keep university-specific assumptions inside `data`, not in new columns.
 
 ## Deletion rules
 

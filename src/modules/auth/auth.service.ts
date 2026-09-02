@@ -15,6 +15,9 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
+  /** Максимальный возраст initData; более старые строки отвергаются */
+  private static readonly INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60;
+
   constructor(
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
@@ -27,16 +30,22 @@ export class AuthService {
       const botToken = this.configService.get<string>('app.telegramBotToken');
       const nodeEnv = this.configService.get<string>('app.nodeEnv');
 
-      // Пропускаем валидацию для мок-данных в dev режиме
-      const isMockData = this.isMockInitData(authDto.initData);
-      const shouldSkipValidation = nodeEnv === 'development' && isMockData;
+      // Мок-данные допустимы только в явном development-окружении;
+      // во всех остальных случаях подпись обязана проверяться (fail closed)
+      const shouldSkipValidation =
+        nodeEnv === 'development' && this.isMockInitData(authDto.initData);
 
-      if (
-        botToken &&
-        !shouldSkipValidation &&
-        !this.validateTelegramInitData(authDto.initData, botToken)
-      ) {
-        throw new BusinessException('Invalid Telegram authentication data');
+      if (!shouldSkipValidation) {
+        if (!botToken) {
+          throw new BusinessException(
+            'Telegram-авторизация не настроена на сервере',
+          );
+        }
+        if (!this.validateTelegramInitData(authDto.initData, botToken)) {
+          throw new BusinessException(
+            'Некорректные данные авторизации Telegram',
+          );
+        }
       }
 
       // Парсим данные из initData
@@ -161,10 +170,12 @@ export class AuthService {
   }
 
   private ensureDevEnvironment(): void {
+    // Разрешаем только при явном development: любое другое окружение
+    // (production, test, не заданное) блокирует dev-вход
     const nodeEnv = this.configService.get<string>('app.nodeEnv');
-    if (nodeEnv === 'production') {
+    if (nodeEnv !== 'development') {
       throw new ForbiddenException(
-        'Web auth is disabled in production environment',
+        'Веб-авторизация доступна только в development-окружении',
       );
     }
   }
@@ -220,6 +231,20 @@ export class AuthService {
 
       params.delete('hash');
 
+      // Отвергаем устаревший initData: без этого утёкшая строка
+      // остаётся действительным пропуском навсегда (replay)
+      const authDate = parseInt(params.get('auth_date') ?? '', 10);
+      if (!Number.isFinite(authDate)) {
+        return false;
+      }
+      const ageSeconds = Math.floor(Date.now() / 1000) - authDate;
+      if (
+        ageSeconds > AuthService.INIT_DATA_MAX_AGE_SECONDS ||
+        ageSeconds < -300
+      ) {
+        return false;
+      }
+
       // Создаем строку для проверки
       const dataCheckString = Array.from(params.entries())
         .sort(([a], [b]) => a.localeCompare(b))
@@ -236,9 +261,13 @@ export class AuthService {
       const calculatedHash = crypto
         .createHmac('sha256', secretKey)
         .update(dataCheckString)
-        .digest('hex');
+        .digest();
 
-      return calculatedHash === hash;
+      const providedHash = Buffer.from(hash, 'hex');
+      return (
+        providedHash.length === calculatedHash.length &&
+        crypto.timingSafeEqual(calculatedHash, providedHash)
+      );
     } catch {
       return false;
     }

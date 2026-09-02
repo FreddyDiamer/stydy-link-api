@@ -5,7 +5,12 @@ import {
   UpdateRequestResponseDto,
   RequestResponseFilterDto,
 } from './dto/request-response.dto';
-import { BaseService, BusinessException, NotFoundException } from '@common';
+import {
+  BaseService,
+  BusinessException,
+  ForbiddenException,
+  NotFoundException,
+} from '@common';
 import { Prisma, RequestResponse, User } from '@prisma/client';
 import { NotificationService } from '../../notifications/notification.service';
 
@@ -135,8 +140,16 @@ export class RequestResponsesService extends BaseService {
     return item;
   }
 
-  async update(id: string, dto: UpdateRequestResponseDto) {
-    await this.findOne(id);
+  async update(id: string, dto: UpdateRequestResponseDto, user: User) {
+    const item = await this.findOne(id);
+    if (item.tutorId !== user.id) {
+      throw new ForbiddenException('Можно редактировать только свой отклик');
+    }
+    if (item.status !== 'PENDING') {
+      throw new BusinessException(
+        'Нельзя изменять отклик после принятия решения по нему',
+      );
+    }
     return this.db.requestResponse.update({
       where: { id },
       data: { ...dto, updatedAt: new Date() },

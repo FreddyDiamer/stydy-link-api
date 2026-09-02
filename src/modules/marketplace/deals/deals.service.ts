@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../database/database.service';
-import { CreateDealDto, UpdateDealDto, DealFilterDto } from './dto/deal.dto';
+import { CreateDealDto, DealFilterDto } from './dto/deal.dto';
 import {
   BaseService,
   BusinessException,
@@ -40,7 +40,13 @@ export class DealsService extends BaseService {
     super();
   }
 
-  async create(dto: CreateDealDto, initiatorUserId?: string) {
+  async create(dto: CreateDealDto, initiatorUserId: string) {
+    // Создавать сделку может только её участник
+    if (initiatorUserId !== dto.studentId && initiatorUserId !== dto.tutorId) {
+      throw new ForbiddenException(
+        'Нельзя создавать сделки от имени других пользователей',
+      );
+    }
     // Проверка существования участников и связей
     const [student, tutor, subject, teacher] = await Promise.all([
       this.db.user.findUnique({ where: { id: dto.studentId } }),
@@ -52,8 +58,23 @@ export class DealsService extends BaseService {
     if (!tutor) throw new NotFoundException('User', dto.tutorId);
     if (!subject) throw new NotFoundException('Subject', dto.subjectId);
     if (!teacher) throw new NotFoundException('Teacher', dto.teacherId);
-    // Проверка на дубликат сделки по отклику
+    // Отклик должен принадлежать именно этой паре студент-репетитор
     if (dto.serviceResponseId) {
+      const response = await this.db.serviceResponse.findUnique({
+        where: { id: dto.serviceResponseId },
+        include: { service: { select: { tutorId: true } } },
+      });
+      if (!response) {
+        throw new NotFoundException('ServiceResponse', dto.serviceResponseId);
+      }
+      if (
+        response.studentId !== dto.studentId ||
+        response.service.tutorId !== dto.tutorId
+      ) {
+        throw new BusinessException(
+          'Отклик не соответствует участникам сделки',
+        );
+      }
       const exists = await this.db.deal.findFirst({
         where: { serviceResponseId: dto.serviceResponseId },
       });
@@ -61,6 +82,21 @@ export class DealsService extends BaseService {
         throw new BusinessException('Сделка по этому отклику уже существует.');
     }
     if (dto.requestResponseId) {
+      const response = await this.db.requestResponse.findUnique({
+        where: { id: dto.requestResponseId },
+        include: { request: { select: { studentId: true } } },
+      });
+      if (!response) {
+        throw new NotFoundException('RequestResponse', dto.requestResponseId);
+      }
+      if (
+        response.tutorId !== dto.tutorId ||
+        response.request.studentId !== dto.studentId
+      ) {
+        throw new BusinessException(
+          'Отклик не соответствует участникам сделки',
+        );
+      }
       const exists = await this.db.deal.findFirst({
         where: { requestResponseId: dto.requestResponseId },
       });
@@ -104,8 +140,12 @@ export class DealsService extends BaseService {
   async findAll(
     pagination: PaginationDto,
     filter: DealFilterDto,
+    currentUserId: string,
   ): Promise<PaginatedResult<DealWithRelations>> {
-    const where: Prisma.DealWhereInput = {};
+    // Пользователь видит только сделки, в которых участвует сам
+    const where: Prisma.DealWhereInput = {
+      OR: [{ studentId: currentUserId }, { tutorId: currentUserId }],
+    };
     if (filter.studentId) where.studentId = filter.studentId;
     if (filter.tutorId) where.tutorId = filter.tutorId;
     if (filter.subjectId) where.subjectId = filter.subjectId;
@@ -181,17 +221,13 @@ export class DealsService extends BaseService {
     return item;
   }
 
-  async update(id: string, dto: UpdateDealDto) {
-    await this.findOne(id);
-    return this.db.deal.update({
-      where: { id },
-      data: { ...dto, updatedAt: new Date() },
-    });
-  }
-
-  async remove(id: string) {
-    await this.findOne(id);
-    await this.db.deal.delete({ where: { id } });
+  /** Получить сделку с проверкой, что пользователь — её участник */
+  async findOneForUser(id: string, userId: string) {
+    const deal = await this.findOne(id);
+    if (deal.studentId !== userId && deal.tutorId !== userId) {
+      throw new ForbiddenException('Вы не являетесь участником этой сделки');
+    }
+    return deal;
   }
 
   private async ensureDealParticipant(

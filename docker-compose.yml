@@ -4,10 +4,11 @@ services:
     container_name: kai-repetitor-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-kai_repetitor}
     ports:
-      - '5432:5432'
+      # Только localhost: наружу БД не публикуем
+      - '127.0.0.1:5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -26,14 +27,17 @@ services:
       target: production
     container_name: kai-repetitor-api
     ports:
-      - '${PORT:-3000}:${PORT:-3000}'
+      # Только localhost: наружу API отдаёт Caddy (TLS)
+      - '127.0.0.1:${PORT:-3000}:${PORT:-3000}'
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
       - PORT=${PORT:-3000}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-kai_repetitor}
-      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-dummy-token-for-development}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-kai_repetitor}
+      # Секреты без небезопасных дефолтов: отсутствие значения валит запуск,
+      # а не поднимает продакшен с известным ключом
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
     volumes:
       - app_logs:/app/logs
     depends_on:

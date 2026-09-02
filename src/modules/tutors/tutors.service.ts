@@ -53,7 +53,8 @@ export class TutorsService extends BaseService {
   }
 
   async getTutorById(id: string) {
-    const user = await this.usersService.findOne(id);
+    // Публичный профиль — без telegramId, balance и настроек нотификаций
+    const user = await this.usersService.findPublicById(id);
     const stats = await this.reviewsService.getTargetStats(id);
 
     const services =

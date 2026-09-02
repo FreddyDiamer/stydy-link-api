@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
   IsNotEmpty,
@@ -50,16 +50,34 @@ export class CreateRequestResponseDto {
   proposedDeadline?: string;
 }
 
-export class UpdateRequestResponseDto extends PartialType(
-  CreateRequestResponseDto,
-) {
+/**
+ * Автор отклика может править только содержимое; статус меняется
+ * исключительно через accept/reject/cancel, привязка (tutorId/requestId)
+ * не изменяется.
+ */
+export class UpdateRequestResponseDto {
   @ApiPropertyOptional({
-    description: 'Статус отклика',
-    enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED'],
+    description: 'Сообщение при отклике',
+    example: 'Готов помочь!',
   })
   @IsOptional()
-  @IsEnum(['PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED'])
-  status?: ResponseStatus;
+  @IsString()
+  message?: string;
+
+  @ApiPropertyOptional({ description: 'Предложенная цена', example: 10000 })
+  @IsOptional()
+  @IsNumber()
+  @Min(100)
+  @Max(10000000)
+  price?: number;
+
+  @ApiPropertyOptional({
+    description: 'Предложенный дедлайн',
+    example: '2024-06-01T10:00:00.000Z',
+  })
+  @IsOptional()
+  @IsDateString()
+  proposedDeadline?: string;
 }
 
 export class RequestResponseFilterDto {

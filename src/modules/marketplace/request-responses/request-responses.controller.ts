@@ -55,13 +55,14 @@ export class RequestResponsesController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Обновить отклик' })
+  @ApiOperation({ summary: 'Обновить отклик (только автор)' })
   @ApiSuccessResponse(RequestResponseResponseDto)
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateRequestResponseDto,
+    @CurrentUser() user: User,
   ) {
-    return this.service.update(id, dto);
+    return this.service.update(id, dto, user);
   }
 
   @Patch(':id/accept')

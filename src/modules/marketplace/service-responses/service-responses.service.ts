@@ -455,10 +455,6 @@ export class ServiceResponsesService extends BaseService {
           ...(updateServiceResponseDto.budgetType !== undefined && {
             budgetType: updateServiceResponseDto.budgetType,
           }),
-          ...(updateServiceResponseDto.status && {
-            status:
-              updateServiceResponseDto.status as Prisma.ServiceResponseUpdateInput['status'],
-          }),
           updatedAt: new Date(),
         },
         include: {
@@ -547,7 +543,10 @@ export class ServiceResponsesService extends BaseService {
         'Только автор услуги может принимать отклики',
       );
     }
-    const updated = await this.update(id, { status: 'ACCEPTED' });
+    if (response.status !== 'PENDING') {
+      throw new BusinessException('Отклик уже обработан');
+    }
+    const updated = await this.setStatus(id, 'ACCEPTED');
     void this.notificationService.notifyServiceResponseAccepted({
       recipientUserId: response.studentId,
       actorName: responseWithService.service?.tutor?.name ?? 'Репетитор',
@@ -585,7 +584,10 @@ export class ServiceResponsesService extends BaseService {
         'Только автор услуги может принимать отклики',
       );
     }
-    const updated = await this.update(id, { status: 'REJECTED' });
+    if (response.status !== 'PENDING') {
+      throw new BusinessException('Отклик уже обработан');
+    }
+    const updated = await this.setStatus(id, 'REJECTED');
     void this.notificationService.notifyServiceResponseRejected({
       recipientUserId: response.studentId,
       actorName: responseWithService.service?.tutor?.name ?? 'Репетитор',
@@ -597,7 +599,51 @@ export class ServiceResponsesService extends BaseService {
   }
 
   async expire(id: string): Promise<ServiceResponse> {
-    return this.update(id, { status: 'EXPIRED' });
+    await this.findOne(id);
+    return this.setStatus(id, 'EXPIRED');
+  }
+
+  /** Смена статуса — только для внутренних переходов (accept/reject/expire) */
+  private setStatus(
+    id: string,
+    status: 'ACCEPTED' | 'REJECTED' | 'EXPIRED',
+  ): Promise<ServiceResponse> {
+    return this.db.serviceResponse.update({
+      where: { id },
+      data: { status, updatedAt: new Date() },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            telegramUsername: true,
+          },
+        },
+        service: {
+          include: {
+            tutor: {
+              select: {
+                id: true,
+                name: true,
+                telegramUsername: true,
+              },
+            },
+            subject: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            teacher: {
+              select: {
+                id: true,
+                fullName: true,
+              },
+            },
+          },
+        },
+      },
+    });
   }
 
   async remove(id: string): Promise<void> {

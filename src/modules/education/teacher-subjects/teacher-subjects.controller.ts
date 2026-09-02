@@ -1,24 +1,16 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-  ParseUUIDPipe,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TeacherSubjectsService } from './teacher-subjects.service';
 import {
-  CreateTeacherSubjectDto,
-  UpdateTeacherSubjectDto,
   TeacherSubjectResponseDto,
   TeacherSubjectFilterDto,
 } from './dto/teacher-subject.dto';
 import { PaginationDto, ApiSuccessResponse } from '@common';
 
+/**
+ * Справочник связей преподаватель-предмет только для чтения: данные наполняет
+ * парсер университетского API, ручное редактирование через публичный API закрыто.
+ */
 @ApiTags('Education - Teacher Subjects')
 @Controller('education/teacher-subjects')
 @ApiBearerAuth()
@@ -26,27 +18,6 @@ export class TeacherSubjectsController {
   constructor(
     private readonly teacherSubjectsService: TeacherSubjectsService,
   ) {}
-
-  @Post()
-  @ApiOperation({
-    summary: 'Создать связь преподавателя с предметом',
-    description:
-      'Создание связи между преподавателем и предметом в справочнике университета',
-  })
-  @ApiSuccessResponse(TeacherSubjectResponseDto)
-  async create(@Body() createTeacherSubjectDto: CreateTeacherSubjectDto) {
-    return this.teacherSubjectsService.create(createTeacherSubjectDto);
-  }
-
-  @Post('bulk')
-  @ApiOperation({
-    summary: 'Массовое создание связей',
-    description: 'Массовое создание связей преподавателей с предметами',
-  })
-  @ApiSuccessResponse(TeacherSubjectResponseDto)
-  async bulkCreate(@Body() relationships: CreateTeacherSubjectDto[]) {
-    return this.teacherSubjectsService.bulkCreate(relationships);
-  }
 
   @Get()
   @ApiOperation({
@@ -118,53 +89,5 @@ export class TeacherSubjectsController {
   @ApiSuccessResponse(TeacherSubjectResponseDto)
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.teacherSubjectsService.findOne(id);
-  }
-
-  @Patch(':id')
-  @ApiOperation({
-    summary: 'Обновить связь',
-    description: 'Обновить связь преподавателя с предметом',
-  })
-  @ApiSuccessResponse(TeacherSubjectResponseDto)
-  async update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateTeacherSubjectDto: UpdateTeacherSubjectDto,
-  ) {
-    return this.teacherSubjectsService.update(id, updateTeacherSubjectDto);
-  }
-
-  @Patch(':id/activate')
-  @ApiOperation({
-    summary: 'Активировать связь',
-    description: 'Активировать связь преподавателя с предметом',
-  })
-  @ApiSuccessResponse(TeacherSubjectResponseDto)
-  async activate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.teacherSubjectsService.activate(id);
-  }
-
-  @Patch(':id/deactivate')
-  @ApiOperation({
-    summary: 'Деактивировать связь',
-    description: 'Деактивировать связь преподавателя с предметом',
-  })
-  @ApiSuccessResponse(TeacherSubjectResponseDto)
-  async deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.teacherSubjectsService.deactivate(id);
-  }
-
-  @Delete(':id')
-  @ApiOperation({
-    summary: 'Удалить связь',
-    description:
-      'Полностью удалить связь преподавателя с предметом (только если не используется)',
-  })
-  @ApiSuccessResponse()
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
-    await this.teacherSubjectsService.remove(id);
-    return {
-      message: 'Связь преподавателя с предметом успешно удалена',
-      deletedAt: new Date(),
-    };
   }
 }

@@ -79,18 +79,13 @@ export class CreateServiceResponseDto {
   budgetType?: string;
 }
 
+/**
+ * Автор отклика может править только содержимое; статус меняется
+ * исключительно через accept/reject у репетитора.
+ */
 export class UpdateServiceResponseDto extends PartialType(
   CreateServiceResponseDto,
-) {
-  @ApiPropertyOptional({
-    description: 'Статус отклика',
-    enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED'],
-    example: 'PENDING',
-  })
-  @IsOptional()
-  @IsEnum(['PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED'])
-  status?: ResponseStatus;
-}
+) {}
 
 export class ServiceResponseFilterDto {
   @ApiPropertyOptional({

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { User, Prisma } from '@prisma/client';
 import { DatabaseService } from '../../database/database.service';
-import { CreateUserDto, UpdateUserDto, UserFilterDto } from './dto/user.dto';
+import { UpdateUserDto, UserFilterDto } from './dto/user.dto';
 import {
   BaseService,
   BusinessException,
@@ -10,54 +10,33 @@ import {
   PaginationDto,
 } from '@common';
 
+/** Поля пользователя, которые можно показывать другим пользователям */
+const PUBLIC_USER_SELECT = {
+  id: true,
+  name: true,
+  telegramUsername: true,
+  description: true,
+  avatarUrl: true,
+  groupId: true,
+  group: true,
+  lastActivity: true,
+  createdAt: true,
+} satisfies Prisma.UserSelect;
+
+export type PublicUser = Prisma.UserGetPayload<{
+  select: typeof PUBLIC_USER_SELECT;
+}>;
+
 @Injectable()
 export class UsersService extends BaseService {
   constructor(private readonly db: DatabaseService) {
     super();
   }
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    try {
-      // Проверяем уникальность telegramId и telegramUsername
-      const existingUser = await this.db.user.findFirst({
-        where: {
-          OR: [
-            { telegramId: createUserDto.telegramId },
-            { telegramUsername: createUserDto.telegramUsername },
-          ],
-        },
-      });
-
-      if (existingUser) {
-        if (existingUser.telegramId === createUserDto.telegramId) {
-          throw new BusinessException(
-            `User with telegramId ${createUserDto.telegramId} already exists`,
-          );
-        }
-        throw new BusinessException(
-          `User with telegramUsername ${createUserDto.telegramUsername} already exists`,
-        );
-      }
-
-      const user = await this.db.user.create({
-        data: createUserDto,
-      });
-
-      this.logInfo(`User created: ${user.id}`, { telegramId: user.telegramId });
-      return user;
-    } catch (error) {
-      if (error instanceof BusinessException) {
-        throw error;
-      }
-      this.logError('Failed to create user', error as Error, createUserDto);
-      throw new BusinessException('Failed to create user');
-    }
-  }
-
   async findAll(
     paginationDto: PaginationDto,
     filterDto: UserFilterDto,
-  ): Promise<PaginatedResult<User>> {
+  ): Promise<PaginatedResult<PublicUser>> {
     try {
       const where: Prisma.UserWhereInput = {};
 
@@ -77,6 +56,7 @@ export class UsersService extends BaseService {
       const [items, total] = await Promise.all([
         this.db.user.findMany({
           where,
+          select: PUBLIC_USER_SELECT,
           skip: paginationDto.skip,
           take: paginationDto.limit,
           orderBy: { createdAt: 'desc' },
@@ -96,15 +76,39 @@ export class UsersService extends BaseService {
         pagination: paginationDto,
         filter: filterDto,
       });
-      throw new BusinessException('Failed to fetch users');
+      throw new BusinessException('Не удалось получить список пользователей');
     }
   }
 
+  /** Полный профиль — только для самого пользователя и внутренней логики */
   async findOne(id: string): Promise<User> {
     const user = await this.db.user.findUnique({
       where: { id },
       include: {
         group: true,
+        services: {
+          where: { status: 'ACTIVE' },
+          include: { subject: true, teacher: true },
+        },
+        requests: {
+          include: { subject: true, teacher: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User', id);
+    }
+
+    return user;
+  }
+
+  /** Публичный профиль для просмотра другими пользователями */
+  async findPublicById(id: string) {
+    const user = await this.db.user.findUnique({
+      where: { id },
+      select: {
+        ...PUBLIC_USER_SELECT,
         services: {
           where: { status: 'ACTIVE' },
           include: { subject: true, teacher: true },
@@ -133,29 +137,6 @@ export class UsersService extends BaseService {
       // Проверяем существование пользователя
       await this.findOne(id);
 
-      // Проверяем уникальность при обновлении
-      if (updateUserDto.telegramId || updateUserDto.telegramUsername) {
-        const existingUser = await this.db.user.findFirst({
-          where: {
-            id: { not: id },
-            OR: [
-              ...(updateUserDto.telegramId
-                ? [{ telegramId: updateUserDto.telegramId }]
-                : []),
-              ...(updateUserDto.telegramUsername
-                ? [{ telegramUsername: updateUserDto.telegramUsername }]
-                : []),
-            ],
-          },
-        });
-
-        if (existingUser) {
-          throw new BusinessException(
-            'User with this telegram ID or username already exists',
-          );
-        }
-      }
-
       const updatedUser = await this.db.user.update({
         where: { id },
         data: {
@@ -177,24 +158,8 @@ export class UsersService extends BaseService {
         id,
         ...updateUserDto,
       });
-      throw new BusinessException('Failed to update user');
+      throw new BusinessException('Не удалось обновить пользователя');
     }
-  }
-
-  async deactivate(id: string): Promise<User> {
-    return this.update(id, { isActive: false });
-  }
-
-  async activate(id: string): Promise<User> {
-    return this.update(id, { isActive: true });
-  }
-
-  async verify(id: string): Promise<User> {
-    return this.update(id, { isVerified: true });
-  }
-
-  async unverify(id: string): Promise<User> {
-    return this.update(id, { isVerified: false });
   }
 
   async updateGroup(id: string, groupId?: string): Promise<User> {
@@ -231,29 +196,11 @@ export class UsersService extends BaseService {
         id,
         groupId,
       });
-      throw new BusinessException('Failed to update user group');
+      throw new BusinessException('Не удалось обновить группу пользователя');
     }
   }
 
-  async remove(id: string): Promise<void> {
-    try {
-      await this.findOne(id);
-
-      await this.db.user.delete({
-        where: { id },
-      });
-
-      this.logInfo(`User deleted: ${id}`);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      this.logError('Failed to delete user', error as Error, { id });
-      throw new BusinessException('Failed to delete user');
-    }
-  }
-
-  async getUserStats(userId: string) {
+  async getUserStats(userId: string, includeBalance = false) {
     const user = await this.findOne(userId);
 
     const [
@@ -303,7 +250,7 @@ export class UsersService extends BaseService {
       // Общие данные
       averageRating: averageRating._avg.rating || 0,
       totalReviews,
-      balance: user.balance,
+      ...(includeBalance ? { balance: user.balance } : {}),
 
       // Флаги активности
       hasServices: activeServices > 0,

@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { BaseService } from '@common';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { BaseService, BusinessException } from '@common';
 import { Worker } from 'worker_threads';
 import { resolve } from 'path';
 import { ParseResultDto } from '../dto/parser-response.dto';
@@ -16,7 +16,47 @@ interface WorkerResponse {
 
 @Injectable()
 export class ParserService extends BaseService {
+  /** Не допускаем параллельных запусков тяжёлой синхронизации */
+  private syncInProgress = false;
+
   async parseAndSync(): Promise<ParseResultDto> {
+    if (this.syncInProgress) {
+      throw new BusinessException(
+        'Синхронизация уже выполняется',
+        'PARSER_BUSY',
+        HttpStatus.CONFLICT,
+      );
+    }
+    this.syncInProgress = true;
+    try {
+      return await this.runWorker();
+    } finally {
+      this.syncInProgress = false;
+    }
+  }
+
+  /**
+   * Фоновый запуск: ошибка воркера логируется, а не остаётся
+   * необработанным rejection (иначе падает весь процесс).
+   */
+  startBackgroundSync(): { message: string } {
+    if (this.syncInProgress) {
+      throw new BusinessException(
+        'Синхронизация уже выполняется',
+        'PARSER_BUSY',
+        HttpStatus.CONFLICT,
+      );
+    }
+    this.parseAndSync().catch((error: unknown) => {
+      this.logError(
+        'Фоновая синхронизация завершилась с ошибкой',
+        this.normalizeError(error),
+      );
+    });
+    return { message: 'Parsing started' };
+  }
+
+  private runWorker(): Promise<ParseResultDto> {
     return new Promise((resolvePromise, reject) => {
       const isProduction =
         process.env.NODE_ENV === 'production' || __dirname.includes('dist');

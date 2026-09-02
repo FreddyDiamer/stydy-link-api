@@ -27,21 +27,18 @@ When you add, change, or remove an endpoint, update this table in the same chang
 
 ## Users — `/users`
 
-| Method | Path                                  | Description                                                          |
-| ------ | ------------------------------------- | -------------------------------------------------------------------- |
-| POST   | `/users`                              | Create a user                                                        |
-| GET    | `/users`                              | List users (pagination + filter)                                     |
-| GET    | `/users/me`                           | Current user's full profile                                          |
-| GET    | `/users/with-services`                | Users who provide services                                           |
-| GET    | `/users/with-requests`                | Users who create requests                                            |
-| GET    | `/users/:id`                          | User by ID                                                           |
-| GET    | `/users/:id/stats`                    | Per-user stats (services & requests)                                 |
-| PATCH  | `/users/me`                           | Update own profile                                                   |
-| PATCH  | `/users/group`                        | Change own group                                                     |
-| PATCH  | `/users/:id`                          | Update a user                                                        |
-| PATCH  | `/users/:id/verify` · `/unverify`     | ⚠️ Legacy: writes `isVerified`, which no longer exists in the schema |
-| PATCH  | `/users/:id/activate` · `/deactivate` | ⚠️ Legacy: writes `isActive`, which no longer exists in the schema   |
-| DELETE | `/users/:id`                          | Delete a user                                                        |
+Admin-style endpoints (create/update/delete arbitrary users, verify/activate) were removed: there is no role system, so they let any user edit anyone. List/`:id` responses expose only public fields (no `telegramId`, `balance`, notification settings).
+
+| Method | Path                   | Description                                                  |
+| ------ | ---------------------- | ------------------------------------------------------------ |
+| GET    | `/users`               | List users — public fields only (pagination + filter)        |
+| GET    | `/users/me`            | Current user's full profile                                  |
+| GET    | `/users/with-services` | Users who provide services                                   |
+| GET    | `/users/with-requests` | Users who create requests                                    |
+| GET    | `/users/:id`           | Public profile by ID                                         |
+| GET    | `/users/:id/stats`     | Per-user stats; `balance` included only for own profile      |
+| PATCH  | `/users/me`            | Update own profile (name, group, notification settings only) |
+| PATCH  | `/users/group`         | Change own group                                             |
 
 ## Tutors — `/tutors`
 
@@ -50,55 +47,45 @@ When you add, change, or remove an endpoint, update this table in the same chang
 | GET    | `/tutors/stats` | Current user's stats as a tutor                 |
 | GET    | `/tutors/:id`   | Public tutor profile: services, rating, reviews |
 
-## Education — `/education/subjects`
+## Education (read-only reference data)
 
-| Method | Path                                               | Description                      |
-| ------ | -------------------------------------------------- | -------------------------------- |
-| POST   | `/education/subjects`                              | Create subject                   |
-| GET    | `/education/subjects`                              | List (pagination + filter)       |
-| GET    | `/education/subjects/active`                       | Active subjects (form selectors) |
-| GET    | `/education/subjects/:id`                          | Subject by ID (teachers + stats) |
-| GET    | `/education/subjects/:id/stats`                    | Usage statistics                 |
-| PATCH  | `/education/subjects/:id`                          | Update                           |
-| PATCH  | `/education/subjects/:id/activate` · `/deactivate` | Toggle availability              |
-| DELETE | `/education/subjects/:id`                          | Delete (only if unused)          |
+Write endpoints (POST/PATCH/DELETE) were removed from all education controllers: reference data is populated by the parser, and without a role system any user could rewrite the university catalog.
 
-## Education — `/education/teachers`
+### `/education/subjects`
+
+| Method | Path                            | Description                      |
+| ------ | ------------------------------- | -------------------------------- |
+| GET    | `/education/subjects`           | List (pagination + filter)       |
+| GET    | `/education/subjects/active`    | Active subjects (form selectors) |
+| GET    | `/education/subjects/:id`       | Subject by ID (teachers + stats) |
+| GET    | `/education/subjects/:id/stats` | Usage statistics                 |
+
+### `/education/teachers`
 
 | Method | Path                                        | Description                      |
 | ------ | ------------------------------------------- | -------------------------------- |
-| POST   | `/education/teachers`                       | Create teacher                   |
 | GET    | `/education/teachers`                       | List (pagination + filter)       |
 | GET    | `/education/teachers/active`                | Teachers with active subjects    |
 | GET    | `/education/teachers/by-subject/:subjectId` | Teachers teaching a subject      |
 | GET    | `/education/teachers/:id`                   | Teacher by ID (subjects + stats) |
 | GET    | `/education/teachers/:id/stats`             | Activity statistics              |
-| PATCH  | `/education/teachers/:id`                   | Update                           |
-| DELETE | `/education/teachers/:id`                   | Delete (only if unused)          |
 
-## Education — `/education/teacher-subjects`
+### `/education/teacher-subjects`
 
-| Method | Path                                                       | Description                  |
-| ------ | ---------------------------------------------------------- | ---------------------------- |
-| POST   | `/education/teacher-subjects`                              | Create link                  |
-| POST   | `/education/teacher-subjects/bulk`                         | Bulk-create links            |
-| GET    | `/education/teacher-subjects`                              | List (pagination + filter)   |
-| GET    | `/education/teacher-subjects/teacher/:teacherId`           | Active subjects of a teacher |
-| GET    | `/education/teacher-subjects/subject/:subjectId`           | Active teachers of a subject |
-| GET    | `/education/teacher-subjects/stats/:teacherId/:subjectId`  | Link stats                   |
-| GET    | `/education/teacher-subjects/:id`                          | Link by ID                   |
-| PATCH  | `/education/teacher-subjects/:id`                          | Update                       |
-| PATCH  | `/education/teacher-subjects/:id/activate` · `/deactivate` | Toggle link                  |
-| DELETE | `/education/teacher-subjects/:id`                          | Delete (only if unused)      |
+| Method | Path                                                      | Description                  |
+| ------ | --------------------------------------------------------- | ---------------------------- |
+| GET    | `/education/teacher-subjects`                             | List (pagination + filter)   |
+| GET    | `/education/teacher-subjects/teacher/:teacherId`          | Active subjects of a teacher |
+| GET    | `/education/teacher-subjects/subject/:subjectId`          | Active teachers of a subject |
+| GET    | `/education/teacher-subjects/stats/:teacherId/:subjectId` | Link stats                   |
+| GET    | `/education/teacher-subjects/:id`                         | Link by ID                   |
 
-## Education — `/education/groups`
+### `/education/groups`
 
 | Method | Path                    | Description     |
 | ------ | ----------------------- | --------------- |
-| POST   | `/education/groups`     | Create group    |
 | GET    | `/education/groups`     | List all groups |
 | GET    | `/education/groups/:id` | Group by ID     |
-| DELETE | `/education/groups/:id` | Delete group    |
 
 ## Marketplace — `/marketplace/services`
 
@@ -157,7 +144,7 @@ When you add, change, or remove an endpoint, update this table in the same chang
 | GET    | `/marketplace/request-responses`            | List (filter)                          |
 | GET    | `/marketplace/request-responses/my`         | Current tutor's responses              |
 | GET    | `/marketplace/request-responses/:id`        | Response by ID                         |
-| PATCH  | `/marketplace/request-responses/:id`        | Update                                 |
+| PATCH  | `/marketplace/request-responses/:id`        | Update content (author only, PENDING)  |
 | PATCH  | `/marketplace/request-responses/:id/accept` | Student accepts → **creates a Deal**   |
 | PATCH  | `/marketplace/request-responses/:id/reject` | Student rejects                        |
 | PATCH  | `/marketplace/request-responses/:id/cancel` | Tutor cancels own response             |
@@ -165,18 +152,18 @@ When you add, change, or remove an endpoint, update this table in the same chang
 
 ## Marketplace — `/marketplace/deals`
 
-| Method | Path                              | Description                                      |
-| ------ | --------------------------------- | ------------------------------------------------ |
-| POST   | `/marketplace/deals`              | Create deal (normal path is response acceptance) |
-| GET    | `/marketplace/deals`              | List (pagination + filter)                       |
-| GET    | `/marketplace/deals/my-tutor`     | Current user's deals as tutor                    |
-| GET    | `/marketplace/deals/:id`          | Deal by ID                                       |
-| PATCH  | `/marketplace/deals/:id/accept`   | Participant accepts (→ `ACCEPTED`)               |
-| PATCH  | `/marketplace/deals/:id/reject`   | Participant rejects                              |
-| PATCH  | `/marketplace/deals/:id/complete` | Mark completed                                   |
-| PATCH  | `/marketplace/deals/:id/cancel`   | Cancel                                           |
-| PATCH  | `/marketplace/deals/:id`          | Update                                           |
-| DELETE | `/marketplace/deals/:id`          | Delete                                           |
+Generic `PATCH`/`DELETE /deals/:id` were removed (they let anyone rewrite any deal); the lifecycle is fully covered by accept/reject/complete/cancel. Every endpoint is participant-scoped: creation requires being the student or the tutor (and a linked response must match that pair), listing and `:id` return only the caller's deals.
+
+| Method | Path                              | Description                                   |
+| ------ | --------------------------------- | --------------------------------------------- |
+| POST   | `/marketplace/deals`              | Create deal (initiator must be a participant) |
+| GET    | `/marketplace/deals`              | Current user's deals (pagination + filter)    |
+| GET    | `/marketplace/deals/my-tutor`     | Current user's deals as tutor                 |
+| GET    | `/marketplace/deals/:id`          | Deal by ID (participants only)                |
+| PATCH  | `/marketplace/deals/:id/accept`   | Participant accepts (→ `ACCEPTED`)            |
+| PATCH  | `/marketplace/deals/:id/reject`   | Participant rejects                           |
+| PATCH  | `/marketplace/deals/:id/complete` | Mark completed                                |
+| PATCH  | `/marketplace/deals/:id/cancel`   | Cancel                                        |
 
 ## Reviews — `/reviews`
 
@@ -197,7 +184,9 @@ When you add, change, or remove an endpoint, update this table in the same chang
 
 ## Parser — `/parser`
 
-| Method  | Path            | Description                                                  |
-| ------- | --------------- | ------------------------------------------------------------ |
-| 🔓 POST | `/parser/sync`  | Parse university data and sync; awaits completion (minutes)  |
-| 🔓 POST | `/parser/async` | Fire-and-forget parse; returns `Parsing started` immediately |
+No longer `@Public()`: both endpoints require a Bearer JWT. Only one sync runs at a time — a second call while one is in progress returns `409 PARSER_BUSY`.
+
+| Method | Path            | Description                                                 |
+| ------ | --------------- | ----------------------------------------------------------- |
+| POST   | `/parser/sync`  | Parse university data and sync; awaits completion (minutes) |
+| POST   | `/parser/async` | Background parse; returns `Parsing started` immediately     |
