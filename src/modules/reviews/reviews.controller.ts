@@ -37,11 +37,7 @@ export class ReviewsController {
     @Body() createReviewDto: CreateReviewDto,
     @CurrentUser() user: User,
   ) {
-    // Проверяем, что пользователь создает отзыв от своего имени
-    if (createReviewDto.authorId !== user.id) {
-      throw new Error('Нельзя создавать отзывы от имени других пользователей');
-    }
-    return this.reviewsService.create(createReviewDto);
+    return this.reviewsService.create(createReviewDto, user.id);
   }
 
   @Get()
@@ -135,6 +131,16 @@ export class ReviewsController {
       items: reviews,
       total: reviews.length,
     };
+  }
+
+  @Get('reputation/:targetId')
+  @ApiOperation({
+    summary: 'Репутация пользователя',
+    description:
+      'Средний рейтинг и число отзывов отдельно как об исполнителе и как о заказчике',
+  })
+  async getReputation(@Param('targetId', ParseUUIDPipe) targetId: string) {
+    return this.reviewsService.getReputation(targetId);
   }
 
   @Get('deal/:dealId')

@@ -54,7 +54,7 @@ export class AuthService {
 
       // Формируем данные пользователя
       const telegramId = telegramUser.id.toString();
-      const telegramUsername = telegramUser.username || '';
+      const telegramUsername = telegramUser.username || null;
       const name = `${telegramUser.first_name}${telegramUser.last_name ? ' ' + telegramUser.last_name : ''}`;
 
       // Ищем существующего пользователя

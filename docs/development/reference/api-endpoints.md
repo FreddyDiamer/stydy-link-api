@@ -154,33 +154,34 @@ Write endpoints (POST/PATCH/DELETE) were removed from all education controllers:
 
 Generic `PATCH`/`DELETE /deals/:id` were removed (they let anyone rewrite any deal); the lifecycle is fully covered by accept/reject/complete/cancel. Every endpoint is participant-scoped: creation requires being the student or the tutor (and a linked response must match that pair), listing and `:id` return only the caller's deals.
 
-| Method | Path                              | Description                                   |
-| ------ | --------------------------------- | --------------------------------------------- |
-| POST   | `/marketplace/deals`              | Create deal (initiator must be a participant) |
-| GET    | `/marketplace/deals`              | Current user's deals (pagination + filter)    |
-| GET    | `/marketplace/deals/my-tutor`     | Current user's deals as tutor                 |
-| GET    | `/marketplace/deals/:id`          | Deal by ID (participants only)                |
-| PATCH  | `/marketplace/deals/:id/accept`   | Participant accepts (→ `ACCEPTED`)            |
-| PATCH  | `/marketplace/deals/:id/reject`   | Participant rejects                           |
-| PATCH  | `/marketplace/deals/:id/complete` | Mark completed                                |
-| PATCH  | `/marketplace/deals/:id/cancel`   | Cancel                                        |
+| Method | Path                              | Description                                                                                    |
+| ------ | --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| POST   | `/marketplace/deals`              | Create deal (initiator must be a participant)                                                  |
+| GET    | `/marketplace/deals`              | Current user's deals (pagination + filter)                                                     |
+| GET    | `/marketplace/deals/my-tutor`     | Current user's deals as tutor                                                                  |
+| GET    | `/marketplace/deals/:id`          | Deal by ID (participants only)                                                                 |
+| PATCH  | `/marketplace/deals/:id/accept`   | Participant accepts (→ `ACCEPTED`)                                                             |
+| PATCH  | `/marketplace/deals/:id/reject`   | Participant rejects                                                                            |
+| PATCH  | `/marketplace/deals/:id/complete` | Confirm completion from your side (deal closes when both confirm, or after 3-day auto-confirm) |
+| PATCH  | `/marketplace/deals/:id/cancel`   | Cancel; optional body `{ reason }` visible to both sides                                       |
 
 ## Reviews — `/reviews`
 
-| Method | Path                           | Description                                        |
-| ------ | ------------------------------ | -------------------------------------------------- |
-| POST   | `/reviews`                     | Create review for a completed deal (author = self) |
-| GET    | `/reviews`                     | List (pagination + filter)                         |
-| GET    | `/reviews/my`                  | Reviews written by current user                    |
-| GET    | `/reviews/about-me`            | Reviews about current user                         |
-| GET    | `/reviews/stats/:targetId`     | Rating statistics for a user                       |
-| GET    | `/reviews/top-rated/:role`     | Top-rated `TUTOR`/`STUDENT` (`?limit`)             |
-| GET    | `/reviews/by-target/:targetId` | Reviews about a user                               |
-| GET    | `/reviews/deal/:dealId`        | Review of a specific deal                          |
-| GET    | `/reviews/:id`                 | Review by ID                                       |
-| PATCH  | `/reviews/:id`                 | Update (author only)                               |
-| PATCH  | `/reviews/:id/reply`           | Tutor replies to a review                          |
-| DELETE | `/reviews/:id`                 | Delete (author only)                               |
+| Method | Path                            | Description                                                                                                                  |
+| ------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/reviews`                      | Create review for a completed deal — body is `{ dealId, rating, comment? }`; author, target and role are derived server-side |
+| GET    | `/reviews`                      | List (pagination + filter)                                                                                                   |
+| GET    | `/reviews/my`                   | Reviews written by current user                                                                                              |
+| GET    | `/reviews/about-me`             | Reviews about current user                                                                                                   |
+| GET    | `/reviews/stats/:targetId`      | Rating statistics for a user                                                                                                 |
+| GET    | `/reviews/top-rated/:role`      | Top-rated `TUTOR`/`STUDENT` (`?limit`)                                                                                       |
+| GET    | `/reviews/by-target/:targetId`  | Reviews about a user                                                                                                         |
+| GET    | `/reviews/deal/:dealId`         | Reviews of a deal (one per side)                                                                                             |
+| GET    | `/reviews/reputation/:targetId` | Reputation split by role (as tutor / as student)                                                                             |
+| GET    | `/reviews/:id`                  | Review by ID                                                                                                                 |
+| PATCH  | `/reviews/:id`                  | Update (author only)                                                                                                         |
+| PATCH  | `/reviews/:id/reply`            | Tutor replies to a review                                                                                                    |
+| DELETE | `/reviews/:id`                  | Delete (author only)                                                                                                         |
 
 ## Parser — `/parser`
 

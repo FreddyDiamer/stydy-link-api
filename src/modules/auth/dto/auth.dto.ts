@@ -90,7 +90,8 @@ export class AuthResponseDto {
   })
   user: {
     id: string;
-    telegramUsername: string;
+    // username есть не у всех — без него нельзя написать человеку из приложения
+    telegramUsername: string | null;
     name: string;
   };
 }
