@@ -93,8 +93,64 @@ export class RequestResponsesService extends BaseService {
     const items = await this.db.requestResponse.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      include: {
+        tutor: {
+          select: {
+            id: true,
+            name: true,
+            telegramUsername: true,
+            avatarUrl: true,
+            createdAt: true,
+            group: { select: { id: true, number: true } },
+          },
+        },
+      },
     });
+
+    await this.attachTutorReputation(items);
+
     return items;
+  }
+
+  /**
+   * Проставляет репетиторам рейтинг и число отзывов: отдельной колонки
+   * рейтинга нет, считаем из отзывов одним запросом на выдачу.
+   */
+  private async attachTutorReputation(
+    items: { tutor?: { id: string } | null }[],
+  ): Promise<void> {
+    const tutorIds = [
+      ...new Set(
+        items.map((i) => i.tutor?.id).filter((id): id is string => !!id),
+      ),
+    ];
+    if (!tutorIds.length) return;
+
+    const grouped = await this.db.review.groupBy({
+      by: ['targetId'],
+      where: { targetId: { in: tutorIds }, targetRole: 'TUTOR' },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    const byId = new Map(
+      grouped.map((row) => [
+        row.targetId,
+        {
+          rating: Math.round((row._avg.rating ?? 0) * 10) / 10,
+          reviewsCount: row._count.rating,
+        },
+      ]),
+    );
+
+    for (const item of items) {
+      if (!item.tutor) continue;
+      const reputation = byId.get(item.tutor.id);
+      Object.assign(item.tutor, {
+        rating: reputation?.rating ?? null,
+        reviewsCount: reputation?.reviewsCount ?? 0,
+      });
+    }
   }
 
   async findByTutor(tutorId: string) {

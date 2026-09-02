@@ -125,6 +125,48 @@ export class ServicesService extends BaseService {
     }
   }
 
+  /**
+   * Проставляет репетиторам рейтинг и число отзывов.
+   * Отдельной колонки рейтинга у пользователя нет — считаем из отзывов одним
+   * запросом на страницу, иначе витрина показывает всем «0.0».
+   */
+  private async attachTutorReputation(
+    items: { tutor?: { id: string } | null }[],
+  ): Promise<void> {
+    const tutorIds = [
+      ...new Set(
+        items.map((i) => i.tutor?.id).filter((id): id is string => !!id),
+      ),
+    ];
+    if (!tutorIds.length) return;
+
+    const grouped = await this.db.review.groupBy({
+      by: ['targetId'],
+      where: { targetId: { in: tutorIds }, targetRole: 'TUTOR' },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    const byId = new Map(
+      grouped.map((row) => [
+        row.targetId,
+        {
+          rating: Math.round((row._avg.rating ?? 0) * 10) / 10,
+          reviewsCount: row._count.rating,
+        },
+      ]),
+    );
+
+    for (const item of items) {
+      if (!item.tutor) continue;
+      const reputation = byId.get(item.tutor.id);
+      Object.assign(item.tutor, {
+        rating: reputation?.rating ?? null,
+        reviewsCount: reputation?.reviewsCount ?? 0,
+      });
+    }
+  }
+
   async findAll(
     queryDto: ServiceQueryDto,
     currentUserId?: string,
@@ -187,6 +229,7 @@ export class ServicesService extends BaseService {
                 id: true,
                 name: true,
                 telegramUsername: true,
+                createdAt: true,
               },
             },
             subject: {
@@ -211,6 +254,8 @@ export class ServicesService extends BaseService {
         }),
         this.db.service.count({ where }),
       ]);
+
+      await this.attachTutorReputation(items);
 
       let resultItems = items;
       if (currentUserId != null) {
@@ -284,6 +329,8 @@ export class ServicesService extends BaseService {
       throw new NotFoundException('Service', id);
     }
 
+    await this.attachTutorReputation([service]);
+
     return service;
   }
 
@@ -298,6 +345,7 @@ export class ServicesService extends BaseService {
       include: {
         tutor: {
           select: {
+            createdAt: true,
             id: true,
             name: true,
             telegramUsername: true,
@@ -322,6 +370,9 @@ export class ServicesService extends BaseService {
         },
       },
     });
+
+    await this.attachTutorReputation(items);
+
     if (currentUserId != null) {
       const serviceIdsWithMyResponse = new Set(
         (
