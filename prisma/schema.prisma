@@ -57,7 +57,9 @@ enum UserRole {
 
 model User {
   id               String @id @default(uuid())
-  telegramUsername String @unique
+  // username в Telegram есть не у всех; пустая строка ломала бы @unique
+  // для второго такого пользователя, поэтому храним null
+  telegramUsername String? @unique
   telegramId       String @unique
 
   // Profile fields
