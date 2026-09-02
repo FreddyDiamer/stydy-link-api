@@ -278,6 +278,11 @@ model Deal {
   deadline  DateTime? // согласованная дата выполнения
   status    DealStatus @default(PENDING)
 
+  // Двустороннее подтверждение выполнения: сделка закрывается, когда обе стороны
+  // отметили, что занятие состоялось (или по авто-подтверждению, см. DealsService)
+  studentConfirmedAt DateTime?
+  tutorConfirmedAt   DateTime?
+
   // Deal создается только из принятого отклика
   serviceResponseId String? @unique
   requestResponseId String? @unique
@@ -295,8 +300,8 @@ model Deal {
   serviceResponse ServiceResponse? @relation("ServiceResponseDeal", fields: [serviceResponseId], references: [id])
   requestResponse RequestResponse? @relation("RequestResponseDeal", fields: [requestResponseId], references: [id])
 
-  // Отзыв по сделке
-  review Review?
+  // Отзывы по сделке: по одному с каждой стороны
+  reviews Review[]
 
   @@map("deals")
 }
@@ -353,7 +358,7 @@ model RequestResponse {
 
 model Review {
   id       String  @id @default(uuid())
-  dealId   String  @unique
+  dealId   String
   authorId String // кто оставил отзыв
   targetId String // кому оставлен отзыв
   rating   Int // 1-5
@@ -371,5 +376,7 @@ model Review {
   author User @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   target User @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Cascade)
 
+  // Каждый участник сделки оставляет не больше одного отзыва
+  @@unique([dealId, authorId])
   @@map("reviews")
 }

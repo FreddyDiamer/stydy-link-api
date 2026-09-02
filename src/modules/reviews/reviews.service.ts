@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Review, Prisma } from '@prisma/client';
+import { Review, Prisma, UserRole } from '@prisma/client';
 import { DatabaseService } from '../../database/database.service';
 import {
   CreateReviewDto,
@@ -26,7 +26,15 @@ export class ReviewsService extends BaseService {
     super();
   }
 
-  async create(createReviewDto: CreateReviewDto): Promise<Review> {
+  /**
+   * Отзыв по завершённой сделке. Автор — текущий пользователь, получатель и его
+   * роль выводятся из сделки: клиент их не присылает, иначе рейтинг можно было бы
+   * приписать кому угодно и в любой роли.
+   */
+  async create(
+    createReviewDto: CreateReviewDto,
+    authorId: string,
+  ): Promise<Review> {
     try {
       // Проверяем существование сделки
       const deal = await this.db.deal.findUnique({
@@ -49,42 +57,38 @@ export class ReviewsService extends BaseService {
       }
 
       // Проверяем, что автор участвует в сделке
-      if (
-        deal.studentId !== createReviewDto.authorId &&
-        deal.tutorId !== createReviewDto.authorId
-      ) {
+      if (deal.studentId !== authorId && deal.tutorId !== authorId) {
         throw new BusinessException(
           'Отзыв может оставить только участник сделки',
         );
       }
 
-      // Проверяем, что получатель участвует в сделке
-      if (
-        deal.studentId !== createReviewDto.targetId &&
-        deal.tutorId !== createReviewDto.targetId
-      ) {
-        throw new BusinessException(
-          'Отзыв можно оставить только участнику сделки',
-        );
-      }
+      // Получатель — вторая сторона сделки, его роль однозначна
+      const authorIsStudent = deal.studentId === authorId;
+      const targetId = authorIsStudent ? deal.tutorId : deal.studentId;
+      const targetRole: UserRole = authorIsStudent
+        ? UserRole.TUTOR
+        : UserRole.STUDENT;
 
-      // Проверяем, что автор и получатель разные люди
-      if (createReviewDto.authorId === createReviewDto.targetId) {
-        throw new BusinessException('Нельзя оставлять отзыв самому себе');
-      }
-
-      // Проверяем, что отзыв еще не оставлен
+      // По одному отзыву с каждой стороны
       const existingReview = await this.db.review.findFirst({
-        where: { dealId: createReviewDto.dealId },
+        where: { dealId: createReviewDto.dealId, authorId },
       });
 
       if (existingReview) {
-        throw new BusinessException('По этой сделке уже оставлен отзыв');
+        throw new BusinessException('Вы уже оставили отзыв по этой сделке');
       }
 
       // Создаем отзыв
       const review = await this.db.review.create({
-        data: createReviewDto,
+        data: {
+          dealId: createReviewDto.dealId,
+          rating: createReviewDto.rating,
+          comment: createReviewDto.comment,
+          authorId,
+          targetId,
+          targetRole,
+        },
         include: {
           author: {
             select: {
@@ -358,15 +362,11 @@ export class ReviewsService extends BaseService {
       // Проверяем существование отзыва
       await this.findOne(id);
 
-      // Нельзя изменять ключевые поля после создания
-      if (
-        updateReviewDto.dealId ||
-        updateReviewDto.authorId ||
-        updateReviewDto.targetId ||
-        updateReviewDto.targetRole
-      ) {
+      // Сделку менять нельзя; автор, получатель и роль вообще не принимаются
+      // от клиента — они выводятся при создании
+      if (updateReviewDto.dealId) {
         throw new BusinessException(
-          'Нельзя изменять сделку, автора или получателя отзыва после создания',
+          'Нельзя изменять сделку отзыва после создания',
         );
       }
 
@@ -534,6 +534,30 @@ export class ReviewsService extends BaseService {
       recentReviews: reviews
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, 5),
+    };
+  }
+
+  /**
+   * Две репутации пользователя: как исполнителя и как заказчика.
+   * Считается из отзывов — отдельной колонки рейтинга у пользователя нет.
+   */
+  async getReputation(targetId: string) {
+    const [asTutor, asStudent] = await Promise.all([
+      this.getTargetStats(targetId, 'TUTOR'),
+      this.getTargetStats(targetId, 'STUDENT'),
+    ]);
+
+    const round = (value: number) => Math.round(value * 10) / 10;
+
+    return {
+      tutor: {
+        rating: round(asTutor.averageRating),
+        count: asTutor.totalReviews,
+      },
+      student: {
+        rating: round(asStudent.averageRating),
+        count: asStudent.totalReviews,
+      },
     };
   }
 
