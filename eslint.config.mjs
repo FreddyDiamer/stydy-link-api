@@ -32,4 +32,15 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-argument': 'warn'
     },
   },
+  {
+    // Матчеры Jest (expect.objectContaining, mock.calls) типизированы как any —
+    // в тестах это неизбежно и не говорит о проблеме в коде
+    files: ['**/*.spec.ts', 'src/test-support/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+    },
+  },
 );

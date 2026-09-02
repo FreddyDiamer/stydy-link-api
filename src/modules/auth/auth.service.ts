@@ -1,9 +1,13 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 import { DatabaseService } from '../../database/database.service';
-import { BusinessException, NotFoundException } from '@common';
+import {
+  BusinessException,
+  ForbiddenException,
+  NotFoundException,
+} from '@common';
 import {
   TelegramAuthDto,
   AuthResponseDto,
