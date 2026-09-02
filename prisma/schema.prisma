@@ -283,6 +283,11 @@ model Deal {
   studentConfirmedAt DateTime?
   tutorConfirmedAt   DateTime?
 
+  // Отмена: кто, когда и почему — отмены должны быть видны обеим сторонам
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelReason  String?
+
   // Deal создается только из принятого отклика
   serviceResponseId String? @unique
   requestResponseId String? @unique

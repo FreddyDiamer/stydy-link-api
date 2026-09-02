@@ -400,7 +400,7 @@ export class DealsService extends BaseService {
     }
   }
 
-  async cancel(id: string, userId: string) {
+  async cancel(id: string, userId: string, reason?: string) {
     await this.ensureDealParticipant(id, userId);
     const deal = (await this.findOne(id)) as DealWithRelations;
     if (
@@ -413,7 +413,13 @@ export class DealsService extends BaseService {
     }
     const updated = await this.db.deal.update({
       where: { id },
-      data: { status: DEAL_STATUS.CANCELLED, updatedAt: new Date() },
+      data: {
+        status: DEAL_STATUS.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledById: userId,
+        cancelReason: reason,
+        updatedAt: new Date(),
+      },
       include: {
         student: true,
         tutor: true,
@@ -432,11 +438,11 @@ export class DealsService extends BaseService {
     });
     const recipientUserId =
       deal.studentId === userId ? deal.tutorId : deal.studentId;
-    const actor = deal.studentId === userId ? deal.tutor : deal.student;
+    const actor = deal.studentId === userId ? deal.student : deal.tutor;
     void this.notificationService.notifyDealRejectedOrCancelled({
       recipientUserId,
       actorName: actor?.name ?? 'Участник',
-      actorUserId: deal.studentId === userId ? deal.tutorId : deal.studentId,
+      actorUserId: userId,
       dealId: id,
       subjectName: deal.subject?.name,
     });

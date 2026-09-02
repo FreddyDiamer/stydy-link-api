@@ -108,6 +108,8 @@ export class RequestResponsesService extends BaseService {
             name: true,
             telegramUsername: true,
             avatarUrl: true,
+            createdAt: true,
+            group: { select: { id: true, number: true } },
           },
         },
         request: {

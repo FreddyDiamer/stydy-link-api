@@ -17,6 +17,7 @@ import {
   DealResponseDto,
   DealListQueryDto,
   DealFilterDto,
+  CancelDealDto,
 } from './dto/deal.dto';
 import { PaginationDto, ApiSuccessResponse, CurrentUser } from '@common';
 import { User } from '@prisma/client';
@@ -82,8 +83,12 @@ export class DealsController {
   @Patch(':id/cancel')
   @ApiOperation({ summary: 'Отменить сделку' })
   @ApiSuccessResponse(DealResponseDto)
-  cancel(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
-    return this.service.cancel(id, user.id);
+  cancel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+    @Body() dto: CancelDealDto,
+  ) {
+    return this.service.cancel(id, user.id, dto?.reason);
   }
 
   @Get(':id')
