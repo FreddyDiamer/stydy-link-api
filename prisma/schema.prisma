@@ -39,6 +39,12 @@ enum DealStatus {
   CANCELLED // отменена
 }
 
+enum RequestStatus {
+  OPEN // ищет репетитора, видна в ленте
+  MATCHED // репетитор выбран, отклики закрыты
+  CLOSED // закрыта автором
+}
+
 enum ResponseStatus {
   PENDING // ожидает ответа
   ACCEPTED // принят
@@ -57,7 +63,9 @@ enum UserRole {
 
 model User {
   id               String @id @default(uuid())
-  telegramUsername String @unique
+  // username в Telegram есть не у всех; пустая строка ломала бы @unique
+  // для второго такого пользователя, поэтому храним null
+  telegramUsername String? @unique
   telegramId       String @unique
 
   // Profile fields
@@ -244,12 +252,14 @@ model Service {
 }
 
 model Request {
-  id          String  @id @default(uuid())
+  id          String        @id @default(uuid())
   studentId   String
   subjectId   String
   teacherId   String
   description String?
   budget      Int? // в копейках, максимальная цена
+  status      RequestStatus @default(OPEN)
+  closedAt    DateTime?
 
   // Срок выполнения
   deadline DateTime?
@@ -278,6 +288,16 @@ model Deal {
   deadline  DateTime? // согласованная дата выполнения
   status    DealStatus @default(PENDING)
 
+  // Двустороннее подтверждение выполнения: сделка закрывается, когда обе стороны
+  // отметили, что занятие состоялось (или по авто-подтверждению, см. DealsService)
+  studentConfirmedAt DateTime?
+  tutorConfirmedAt   DateTime?
+
+  // Отмена: кто, когда и почему — отмены должны быть видны обеим сторонам
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelReason  String?
+
   // Deal создается только из принятого отклика
   serviceResponseId String? @unique
   requestResponseId String? @unique
@@ -295,8 +315,8 @@ model Deal {
   serviceResponse ServiceResponse? @relation("ServiceResponseDeal", fields: [serviceResponseId], references: [id])
   requestResponse RequestResponse? @relation("RequestResponseDeal", fields: [requestResponseId], references: [id])
 
-  // Отзыв по сделке
-  review Review?
+  // Отзывы по сделке: по одному с каждой стороны
+  reviews Review[]
 
   @@map("deals")
 }
@@ -353,7 +373,7 @@ model RequestResponse {
 
 model Review {
   id       String  @id @default(uuid())
-  dealId   String  @unique
+  dealId   String
   authorId String // кто оставил отзыв
   targetId String // кому оставлен отзыв
   rating   Int // 1-5
@@ -371,5 +391,7 @@ model Review {
   author User @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   target User @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Cascade)
 
+  // Каждый участник сделки оставляет не больше одного отзыва
+  @@unique([dealId, authorId])
   @@map("reviews")
 }

@@ -81,6 +81,16 @@ export class UpdateDealDto extends PartialType(CreateDealDto) {
   status?: DealStatus;
 }
 
+export class CancelDealDto {
+  @ApiPropertyOptional({
+    description: 'Причина отмены, видна обеим сторонам',
+    example: 'Не совпало расписание',
+  })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 export class DealFilterDto {
   @ApiPropertyOptional({ description: 'ID студента' })
   @IsOptional()

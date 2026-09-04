@@ -22,31 +22,8 @@ export class CreateReviewDto {
   @IsUUID()
   dealId: string;
 
-  @ApiProperty({
-    description: 'ID автора отзыва',
-    example: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
-  })
-  @IsString()
-  @IsNotEmpty()
-  @IsUUID()
-  authorId: string;
-
-  @ApiProperty({
-    description: 'ID получателя отзыва',
-    example: 'f47ac10b-58cc-4372-a567-0e02b2c3d481',
-  })
-  @IsString()
-  @IsNotEmpty()
-  @IsUUID()
-  targetId: string;
-
-  @ApiProperty({
-    description: 'Роль получателя отзыва',
-    enum: ['TUTOR', 'STUDENT'],
-    example: 'TUTOR',
-  })
-  @IsEnum(UserRole)
-  targetRole: UserRole;
+  // Автор, получатель и его роль выводятся на сервере из сделки и текущего
+  // пользователя — клиент их не присылает и подменить не может.
 
   @ApiProperty({
     description: 'Рейтинг от 1 до 5',

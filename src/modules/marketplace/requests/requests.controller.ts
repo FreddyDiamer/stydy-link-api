@@ -143,6 +143,25 @@ export class RequestsController {
     return this.requestsService.findOne(id);
   }
 
+  @Patch(':id/close')
+  @ApiOperation({
+    summary: 'Закрыть заявку',
+    description: 'Заявка уходит из ленты, оставшиеся отклики отклоняются',
+  })
+  close(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.requestsService.close(id, user.id);
+  }
+
+  @Post(':id/reopen')
+  @ApiOperation({
+    summary: 'Переоткрыть заявку',
+    description:
+      'Создаёт новую публикацию с теми же условиями; старые отклики не переносятся',
+  })
+  reopen(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.requestsService.reopen(id, user.id);
+  }
+
   @Patch(':id')
   @ApiOperation({
     summary: 'Обновить заявку',

@@ -6,11 +6,20 @@ import {
   UpdateRequestDto,
   RequestFilterDto,
 } from './dto/request.dto';
-import { BaseService, BusinessException, NotFoundException } from '@common';
+import {
+  BaseService,
+  BusinessException,
+  ForbiddenException,
+  NotFoundException,
+} from '@common';
+import { NotificationService } from '../../notifications/notification.service';
 
 @Injectable()
 export class RequestsService extends BaseService {
-  constructor(private readonly db: DatabaseService) {
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly notificationService: NotificationService,
+  ) {
     super();
   }
 
@@ -134,6 +143,14 @@ export class RequestsService extends BaseService {
   ): Promise<(Request & { currentUserResponded?: boolean })[]> {
     try {
       const where: Prisma.RequestWhereInput = {};
+
+      // Заявка не исчезает физически, а выпадает из ленты: закрытые и
+      // нашедшие репетитора видны только автору и по прямой ссылке
+      if (filterDto.status) {
+        where.status = filterDto.status as Prisma.RequestWhereInput['status'];
+      } else if (!filterDto.studentId) {
+        where.status = 'OPEN';
+      }
 
       // Фильтры
       if (filterDto.studentId) {
@@ -481,6 +498,75 @@ export class RequestsService extends BaseService {
       });
       throw new BusinessException('Не удалось обновить заявку');
     }
+  }
+
+  /** Закрыть заявку: уходит из ленты, отклики больше не принимаются. */
+  async close(id: string, userId: string): Promise<Request> {
+    const request = await this.findOne(id);
+    if (request.studentId !== userId) {
+      throw new ForbiddenException('Закрыть заявку может только её автор');
+    }
+    if (request.status === 'CLOSED') {
+      throw new BusinessException('Заявка уже закрыта');
+    }
+
+    const pending = await this.db.requestResponse.findMany({
+      where: { requestId: id, status: 'PENDING' },
+      select: { id: true, tutorId: true },
+    });
+
+    const [updated] = await this.db.$transaction([
+      this.db.request.update({
+        where: { id },
+        data: { status: 'CLOSED', closedAt: new Date(), updatedAt: new Date() },
+      }),
+      this.db.requestResponse.updateMany({
+        where: { requestId: id, status: 'PENDING' },
+        data: { status: 'REJECTED', updatedAt: new Date() },
+      }),
+    ]);
+
+    // откликнувшиеся не должны узнавать об этом молчанием
+    for (const response of pending) {
+      void this.notificationService.notifyRequestResponseRejected({
+        recipientUserId: response.tutorId,
+        actorName: 'Студент',
+        actorUserId: userId,
+        responseId: response.id,
+      });
+    }
+
+    return updated;
+  }
+
+  /**
+   * Переоткрыть заявку — это новая публикация, а не откат: старые отклики
+   * не воскресают, иначе автор ждёт ответа от тех, кто уже забыл о заявке.
+   */
+  async reopen(id: string, userId: string): Promise<Request> {
+    const request = await this.findOne(id);
+    if (request.studentId !== userId) {
+      throw new ForbiddenException('Переоткрыть заявку может только её автор');
+    }
+    if (request.status === 'OPEN') {
+      throw new BusinessException('Заявка и так открыта');
+    }
+
+    return this.db.request.create({
+      data: {
+        studentId: request.studentId,
+        subjectId: request.subjectId,
+        teacherId: request.teacherId,
+        description: request.description,
+        budget: request.budget,
+        deadline: request.deadline,
+      },
+      include: {
+        student: true,
+        subject: true,
+        teacher: true,
+      },
+    });
   }
 
   async remove(id: string): Promise<void> {

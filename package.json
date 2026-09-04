@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node -O '{\"module\":\"commonjs\"}' prisma/seed.ts"
   },
   "scripts": {
     "build": "nest build",
@@ -23,10 +23,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prepare": "husky",
-    "prisma:seed": "ts-node -O '{\"module\":\"commonjs\"}' prisma/seed.ts"
-  },
-  "prisma": {
-    "seed": "ts-node -O '{\"module\":\"commonjs\"}' prisma/seed.ts"
+    "prisma:seed": "ts-node -O '{\"module\":\"commonjs\"}' prisma/seed.ts",
+    "test:e2e:setup": "DATABASE_URL=${DATABASE_URL_TEST:-postgresql://postgres:postgres@localhost:5432/studylink_test} prisma migrate deploy"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -103,7 +101,11 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@common$": "<rootDir>/common",
+      "^@common/(.*)$": "<rootDir>/common/$1"
+    }
   },
   "lint-staged": {
     "*.{ts,js}": [
