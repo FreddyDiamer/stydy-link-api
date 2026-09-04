@@ -9,7 +9,12 @@ import {
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  OmitType,
+  PartialType,
+} from '@nestjs/swagger';
 
 export class CreateRequestDto {
   @ApiProperty({
@@ -67,7 +72,13 @@ export class CreateRequestDto {
   deadline?: string;
 }
 
-export class UpdateRequestDto extends PartialType(CreateRequestDto) {}
+/**
+ * Автор правит только содержание заявки: владелец (`studentId`) не меняется,
+ * иначе заявку можно было бы переписать на другого пользователя.
+ */
+export class UpdateRequestDto extends PartialType(
+  OmitType(CreateRequestDto, ['studentId'] as const),
+) {}
 
 export class RequestFilterDto {
   @ApiPropertyOptional({

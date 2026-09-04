@@ -408,9 +408,6 @@ export class RequestsService extends BaseService {
       const updatedRequest = await this.db.request.update({
         where: { id },
         data: {
-          ...(updateRequestDto.studentId && {
-            studentId: updateRequestDto.studentId,
-          }),
           ...(updateRequestDto.subjectId && {
             subjectId: updateRequestDto.subjectId,
           }),
