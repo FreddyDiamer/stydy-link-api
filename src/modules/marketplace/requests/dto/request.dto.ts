@@ -1,4 +1,5 @@
 import {
+  IsEnum,
   IsString,
   IsNotEmpty,
   IsOptional,
@@ -70,6 +71,14 @@ export class CreateRequestDto {
 export class UpdateRequestDto extends PartialType(CreateRequestDto) {}
 
 export class RequestFilterDto {
+  @ApiPropertyOptional({
+    description: 'Статус заявки; по умолчанию лента показывает только OPEN',
+    enum: ['OPEN', 'MATCHED', 'CLOSED'],
+  })
+  @IsOptional()
+  @IsEnum(['OPEN', 'MATCHED', 'CLOSED'])
+  status?: 'OPEN' | 'MATCHED' | 'CLOSED';
+
   @ApiPropertyOptional({
     description: 'Фильтр по ID студента',
     example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',

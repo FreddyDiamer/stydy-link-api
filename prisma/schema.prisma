@@ -39,6 +39,12 @@ enum DealStatus {
   CANCELLED // отменена
 }
 
+enum RequestStatus {
+  OPEN // ищет репетитора, видна в ленте
+  MATCHED // репетитор выбран, отклики закрыты
+  CLOSED // закрыта автором
+}
+
 enum ResponseStatus {
   PENDING // ожидает ответа
   ACCEPTED // принят
@@ -246,12 +252,14 @@ model Service {
 }
 
 model Request {
-  id          String  @id @default(uuid())
+  id          String        @id @default(uuid())
   studentId   String
   subjectId   String
   teacherId   String
   description String?
   budget      Int? // в копейках, максимальная цена
+  status      RequestStatus @default(OPEN)
+  closedAt    DateTime?
 
   // Срок выполнения
   deadline DateTime?
