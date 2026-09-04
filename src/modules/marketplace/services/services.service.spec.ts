@@ -2,9 +2,9 @@ import { Test } from '@nestjs/testing';
 import { ServicesService } from './services.service';
 import { DatabaseService } from '../../../database/database.service';
 import {
-  createPrismaMock,
+  createDatabaseMock,
   expectBusinessError,
-  PrismaMock,
+  DatabaseMock,
 } from '../../../test-support/mocks';
 
 const TUTOR = 'tutor-1';
@@ -38,10 +38,10 @@ const createDto = (overrides: Record<string, unknown> = {}) =>
 
 describe('ServicesService', () => {
   let service: ServicesService;
-  let db: PrismaMock;
+  let db: DatabaseMock;
 
   beforeEach(async () => {
-    db = createPrismaMock();
+    db = createDatabaseMock();
 
     const moduleRef = await Test.createTestingModule({
       providers: [ServicesService, { provide: DatabaseService, useValue: db }],

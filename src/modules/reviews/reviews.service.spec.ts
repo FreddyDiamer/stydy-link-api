@@ -4,9 +4,9 @@ import { DatabaseService } from '../../database/database.service';
 import { NotificationService } from '../notifications/notification.service';
 import {
   createNotificationMock,
-  createPrismaMock,
+  createDatabaseMock,
   expectBusinessError,
-  PrismaMock,
+  DatabaseMock,
 } from '../../test-support/mocks';
 
 const STUDENT = 'student-1';
@@ -33,11 +33,11 @@ const createdReview = (data: Record<string, unknown>) => ({
 
 describe('ReviewsService', () => {
   let service: ReviewsService;
-  let db: PrismaMock;
+  let db: DatabaseMock;
   let notifications: ReturnType<typeof createNotificationMock>;
 
   beforeEach(async () => {
-    db = createPrismaMock();
+    db = createDatabaseMock();
     notifications = createNotificationMock();
 
     const moduleRef = await Test.createTestingModule({
@@ -266,6 +266,22 @@ describe('ReviewsService', () => {
         tutor: { rating: 4.5, count: 2 },
         student: { rating: 3, count: 1 },
       });
+    });
+
+    it('округляет средний рейтинг до одного знака', async () => {
+      db.review.findMany
+        .mockResolvedValueOnce([{ rating: 5, createdAt: new Date() }])
+        .mockResolvedValueOnce([]);
+      db.review.aggregate
+        .mockResolvedValueOnce({ _avg: { rating: 4.86 } })
+        .mockResolvedValueOnce({ _avg: { rating: null } });
+      db.review.groupBy.mockResolvedValue([]);
+
+      const reputation = await service.getReputation('user-1');
+
+      expect(reputation.tutor.rating).toBe(4.9);
+      expect(reputation.tutor.count).toBe(1);
+      expect(reputation.student.count).toBe(0);
     });
 
     it('у пользователя без отзывов репутация нулевая, а не ошибка', async () => {

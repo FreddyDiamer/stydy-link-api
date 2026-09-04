@@ -1,90 +1,109 @@
 /**
- * Shared mocks for unit tests. Никогда не ходим в реальную базу:
- * `DatabaseService` подменяется объектом с jest-моками на каждую модель.
+ * Заглушки для юнит-тестов сервисов: настоящая база в тестах не поднимается,
+ * проверяем бизнес-правила, а не Prisma.
+ *
+ * Каталог исключён из прод-сборки (`tsconfig.build.json`).
  */
 
-type PrismaModelMock = {
-  findUnique: jest.Mock;
-  findFirst: jest.Mock;
-  findMany: jest.Mock;
-  create: jest.Mock;
-  update: jest.Mock;
-  updateMany: jest.Mock;
-  upsert: jest.Mock;
-  delete: jest.Mock;
-  count: jest.Mock;
-  aggregate: jest.Mock;
-  groupBy: jest.Mock;
-};
+export type MockedModel = Record<string, jest.Mock>;
 
-const MODELS = [
-  'user',
-  'group',
-  'subject',
-  'teacher',
-  'teacherSubject',
-  'service',
-  'request',
-  'serviceResponse',
-  'requestResponse',
-  'deal',
-  'review',
-] as const;
+const model = (): MockedModel => ({
+  findUnique: jest.fn(),
+  findFirst: jest.fn(),
+  findMany: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
+  updateMany: jest.fn(),
+  upsert: jest.fn(),
+  delete: jest.fn(),
+  deleteMany: jest.fn(),
+  count: jest.fn(),
+  groupBy: jest.fn(),
+  aggregate: jest.fn(),
+});
 
-export type PrismaMock = Record<(typeof MODELS)[number], PrismaModelMock> & {
+export interface DatabaseMock {
+  deal: MockedModel;
+  request: MockedModel;
+  requestResponse: MockedModel;
+  serviceResponse: MockedModel;
+  service: MockedModel;
+  review: MockedModel;
+  user: MockedModel;
+  group: MockedModel;
+  subject: MockedModel;
+  teacher: MockedModel;
+  teacherSubject: MockedModel;
   $transaction: jest.Mock;
-};
-
-function createModelMock(): PrismaModelMock {
-  return {
-    findUnique: jest.fn(),
-    findFirst: jest.fn(),
-    findMany: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    updateMany: jest.fn(),
-    upsert: jest.fn(),
-    delete: jest.fn(),
-    count: jest.fn(),
-    aggregate: jest.fn(),
-    groupBy: jest.fn(),
-  };
 }
 
-export function createPrismaMock(): PrismaMock {
-  const db = {
-    // Прокидываем колбэк транзакции сам себя: тесты проверяют логику,
-    // а не атомарность, которую обеспечивает Prisma
+export const createDatabaseMock = (): DatabaseMock => {
+  const db: DatabaseMock = {
+    deal: model(),
+    request: model(),
+    requestResponse: model(),
+    serviceResponse: model(),
+    service: model(),
+    review: model(),
+    user: model(),
+    group: model(),
+    subject: model(),
+    teacher: model(),
+    teacherSubject: model(),
+    // транзакция в тестах прозрачна: и колбэк, и массив промисов
     $transaction: jest.fn((arg: unknown) =>
       typeof arg === 'function'
-        ? (arg as (tx: unknown) => unknown)(db)
+        ? (arg as (tx: DatabaseMock) => unknown)(db)
         : Promise.all(arg as Promise<unknown>[]),
     ),
-  } as PrismaMock;
-
-  for (const model of MODELS) {
-    db[model] = createModelMock();
-  }
-
+  };
   return db;
+};
+
+const NOTIFY_METHODS = [
+  'notifyServiceResponseCreated',
+  'notifyServiceResponseAccepted',
+  'notifyServiceResponseRejected',
+  'notifyRequestResponseCreated',
+  'notifyRequestResponseAccepted',
+  'notifyRequestResponseRejected',
+  'notifyDealCreated',
+  'notifyDealAccepted',
+  'notifyDealRejectedOrCancelled',
+  'notifyDealCompleted',
+  'notifyDealReopened',
+  'notifyReviewCreated',
+  'notifyReviewReply',
+] as const;
+
+/**
+ * Уведомления fire-and-forget: в тестах только фиксируем факт вызова.
+ * Объект явный, а не Proxy: Proxy отвечает функцией и на `then`,
+ * из-за чего Nest принимает провайдер за промис и зависает на compile().
+ */
+export const createNotificationMock = (): Record<string, jest.Mock> =>
+  Object.fromEntries(
+    NOTIFY_METHODS.map((name) => [
+      name,
+      jest.fn().mockResolvedValue(undefined),
+    ]),
+  );
+
+/** Типизированный доступ к аргументам вызова: без него линтер видит `any`. */
+export const firstCallArg = <T>(mock: jest.Mock): T => {
+  const calls = mock.mock.calls as unknown as unknown[][];
+  return calls[0][0] as T;
+};
+
+/** Аргумент записи в Prisma: интересуют where и data. */
+export interface WriteArg {
+  where?: Record<string, unknown>;
+  data: Record<string, unknown>;
 }
 
-/** Уведомления в тестах — заглушки: они fire-and-forget и не влияют на результат */
-export function createNotificationMock() {
-  return {
-    notifyServiceResponseCreated: jest.fn().mockResolvedValue(undefined),
-    notifyServiceResponseAccepted: jest.fn().mockResolvedValue(undefined),
-    notifyServiceResponseRejected: jest.fn().mockResolvedValue(undefined),
-    notifyRequestResponseCreated: jest.fn().mockResolvedValue(undefined),
-    notifyRequestResponseAccepted: jest.fn().mockResolvedValue(undefined),
-    notifyRequestResponseRejected: jest.fn().mockResolvedValue(undefined),
-    notifyDealCreated: jest.fn().mockResolvedValue(undefined),
-    notifyDealAccepted: jest.fn().mockResolvedValue(undefined),
-    notifyDealRejectedOrCancelled: jest.fn().mockResolvedValue(undefined),
-    notifyDealCompleted: jest.fn().mockResolvedValue(undefined),
-    notifyReviewCreated: jest.fn().mockResolvedValue(undefined),
-    notifyReviewReply: jest.fn().mockResolvedValue(undefined),
-  };
+/** Аргумент чтения из Prisma. */
+export interface ReadArg {
+  where: Record<string, unknown>;
 }
 
 /**

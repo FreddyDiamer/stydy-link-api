@@ -78,6 +78,17 @@ export class DealsController {
     return this.service.complete(id, user.id);
   }
 
+  @Patch(':id/reopen')
+  @ApiOperation({
+    summary: 'Работа ещё не готова',
+    description:
+      'Снимает подтверждение второй стороны и останавливает авто-закрытие сделки',
+  })
+  @ApiSuccessResponse(DealResponseDto)
+  reopen(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.service.reopen(id, user.id);
+  }
+
   @Patch(':id/cancel')
   @ApiOperation({ summary: 'Отменить сделку' })
   @ApiSuccessResponse(DealResponseDto)

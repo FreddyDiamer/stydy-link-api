@@ -486,6 +486,26 @@ export class NotificationService extends BaseService {
     });
   }
 
+  /** Вторая сторона сказала, что работа ещё не готова — подтверждение снято. */
+  async notifyDealReopened(payload: DealCompletedPayload): Promise<void> {
+    await Promise.resolve();
+    this.fireAndForget(async () => {
+      if (!(await this.shouldNotify(payload.recipientUserId, 'onDeal'))) return;
+      const user = await this.db.user.findUnique({
+        where: { id: payload.recipientUserId },
+        select: { telegramId: true },
+      });
+      if (!user?.telegramId) return;
+
+      let text = `⏳ <b>Работа ещё не принята</b>\n\n`;
+      text += `${escapeHtml(payload.actorName)} отметил, что работа ещё не готова.\n`;
+      if (payload.subjectName)
+        text += `📚 Предмет: ${escapeHtml(payload.subjectName)}\n`;
+      text += `\nСделка снова в работе — подтвердите выполнение, когда закончите.`;
+      await this.telegramBot.sendMessage(user.telegramId, text);
+    });
+  }
+
   async notifyReviewCreated(payload: ReviewCreatedPayload): Promise<void> {
     await Promise.resolve();
     this.fireAndForget(async () => {

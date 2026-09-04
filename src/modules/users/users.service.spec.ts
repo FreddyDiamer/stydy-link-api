@@ -2,9 +2,9 @@ import { Test } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { DatabaseService } from '../../database/database.service';
 import {
-  createPrismaMock,
+  createDatabaseMock,
   expectBusinessError,
-  PrismaMock,
+  DatabaseMock,
 } from '../../test-support/mocks';
 
 /** Поля, которые не должны утекать в публичные ответы */
@@ -17,10 +17,10 @@ const PRIVATE_FIELDS = [
 
 describe('UsersService', () => {
   let service: UsersService;
-  let db: PrismaMock;
+  let db: DatabaseMock;
 
   beforeEach(async () => {
-    db = createPrismaMock();
+    db = createDatabaseMock();
 
     const moduleRef = await Test.createTestingModule({
       providers: [UsersService, { provide: DatabaseService, useValue: db }],

@@ -5,9 +5,9 @@ import { DatabaseService } from '../../../database/database.service';
 import { NotificationService } from '../../notifications/notification.service';
 import {
   createNotificationMock,
-  createPrismaMock,
+  createDatabaseMock,
   expectBusinessError,
-  PrismaMock,
+  DatabaseMock,
 } from '../../../test-support/mocks';
 
 const STUDENT = 'student-1';
@@ -41,11 +41,11 @@ const response = (overrides: Record<string, unknown> = {}) => ({
 
 describe('ServiceResponsesService', () => {
   let sut: ServiceResponsesService;
-  let db: PrismaMock;
+  let db: DatabaseMock;
   let notifications: ReturnType<typeof createNotificationMock>;
 
   beforeEach(async () => {
-    db = createPrismaMock();
+    db = createDatabaseMock();
     notifications = createNotificationMock();
 
     const moduleRef = await Test.createTestingModule({

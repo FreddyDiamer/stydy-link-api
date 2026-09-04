@@ -1,10 +1,15 @@
 import { Test } from '@nestjs/testing';
 import { RequestsService } from './requests.service';
 import { DatabaseService } from '../../../database/database.service';
+import { NotificationService } from '../../notifications/notification.service';
 import {
-  createPrismaMock,
+  createDatabaseMock,
+  createNotificationMock,
   expectBusinessError,
-  PrismaMock,
+  firstCallArg,
+  type DatabaseMock,
+  type ReadArg,
+  type WriteArg,
 } from '../../../test-support/mocks';
 
 const STUDENT = 'student-1';
@@ -18,6 +23,7 @@ const requestRow = (overrides: Record<string, unknown> = {}) => ({
   budget: 150000,
   description: 'Нужна помощь с матанализом',
   deadline: new Date('2026-12-01'),
+  status: 'OPEN',
   responses: [],
   ...overrides,
 });
@@ -34,13 +40,17 @@ const createDto = (overrides: Record<string, unknown> = {}) =>
 
 describe('RequestsService', () => {
   let service: RequestsService;
-  let db: PrismaMock;
+  let db: DatabaseMock;
 
   beforeEach(async () => {
-    db = createPrismaMock();
+    db = createDatabaseMock();
 
     const moduleRef = await Test.createTestingModule({
-      providers: [RequestsService, { provide: DatabaseService, useValue: db }],
+      providers: [
+        RequestsService,
+        { provide: DatabaseService, useValue: db },
+        { provide: NotificationService, useValue: createNotificationMock() },
+      ],
     }).compile();
 
     service = moduleRef.get(RequestsService);
@@ -222,6 +232,109 @@ describe('RequestsService', () => {
         () => service.update('missing', { budget: 200000 }),
         { code: 'NOT_FOUND', status: 404 },
       );
+    });
+  });
+
+  describe('лента', () => {
+    beforeEach(() => {
+      db.request.findMany.mockResolvedValue([]);
+    });
+
+    it('по умолчанию показывает только открытые заявки', async () => {
+      await service.findAll({});
+
+      const { where } = firstCallArg<ReadArg>(db.request.findMany);
+      expect(where.status).toBe('OPEN');
+    });
+
+    it('автору отдаёт все его заявки, включая закрытые', async () => {
+      await service.findAll({ studentId: STUDENT });
+
+      const { where } = firstCallArg<ReadArg>(db.request.findMany);
+      expect(where.status).toBeUndefined();
+      expect(where.studentId).toBe(STUDENT);
+    });
+  });
+
+  describe('закрытие заявки', () => {
+    beforeEach(() => {
+      db.requestResponse.findMany.mockResolvedValue([]);
+      db.request.update.mockResolvedValue(requestRow({ status: 'CLOSED' }));
+    });
+
+    it('переводит заявку в CLOSED и помечает время', async () => {
+      await service.close('request-1', STUDENT);
+
+      const { data } = firstCallArg<WriteArg>(db.request.update);
+      expect(data.status).toBe('CLOSED');
+      expect(data.closedAt).toBeInstanceOf(Date);
+    });
+
+    it('отклоняет оставшиеся отклики', async () => {
+      await service.close('request-1', STUDENT);
+
+      expect(db.requestResponse.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { requestId: 'request-1', status: 'PENDING' },
+          data: expect.objectContaining({ status: 'REJECTED' }) as unknown,
+        }),
+      );
+    });
+
+    it('доступно только автору', async () => {
+      await expectBusinessError(() => service.close('request-1', TUTOR), {
+        code: 'FORBIDDEN',
+        status: 403,
+      });
+      expect(db.request.update).not.toHaveBeenCalled();
+    });
+
+    it('не закрывает дважды', async () => {
+      db.request.findUnique.mockResolvedValue(requestRow({ status: 'CLOSED' }));
+
+      await expectBusinessError(() => service.close('request-1', STUDENT), {
+        status: 400,
+      });
+      expect(db.request.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('переоткрытие заявки', () => {
+    beforeEach(() => {
+      db.request.findUnique.mockResolvedValue(requestRow({ status: 'CLOSED' }));
+      db.request.create.mockResolvedValue(requestRow({ id: 'request-2' }));
+    });
+
+    it('создаёт новую публикацию с теми же условиями', async () => {
+      await service.reopen('request-1', STUDENT);
+
+      const { data } = firstCallArg<WriteArg>(db.request.create);
+      expect(data.subjectId).toBe('subject-1');
+      expect(data.budget).toBe(150000);
+      expect(data.description).toBe('Нужна помощь с матанализом');
+    });
+
+    it('не воскрешает старые отклики', async () => {
+      await service.reopen('request-1', STUDENT);
+
+      expect(db.request.update).not.toHaveBeenCalled();
+      expect(db.requestResponse.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('не переоткрывает уже открытую заявку', async () => {
+      db.request.findUnique.mockResolvedValue(requestRow());
+
+      await expectBusinessError(() => service.reopen('request-1', STUDENT), {
+        status: 400,
+      });
+      expect(db.request.create).not.toHaveBeenCalled();
+    });
+
+    it('доступно только автору', async () => {
+      await expectBusinessError(() => service.reopen('request-1', TUTOR), {
+        code: 'FORBIDDEN',
+        status: 403,
+      });
     });
   });
 

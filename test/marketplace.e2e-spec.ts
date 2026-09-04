@@ -1,0 +1,208 @@
+import * as request from 'supertest';
+import type { Server } from 'http';
+import { body, createTestApp, resetDatabase, type TestApp } from './utils/app';
+
+/**
+ * Сквозной проход петли по HTTP на настоящей базе: заявка → отклик →
+ * выбор репетитора → сделка → двустороннее подтверждение → отзывы.
+ * Здесь проверяется то, чего не видят юнит-тесты: конвейер запросов,
+ * реальные транзакции и ограничения схемы.
+ */
+describe('Маркетплейс (e2e)', () => {
+  let ctx: TestApp;
+  let server: Server;
+
+  let studentId: string;
+  let tutorId: string;
+  let subjectId: string;
+  let teacherId: string;
+  let studentToken: string;
+  let tutorToken: string;
+
+  beforeAll(async () => {
+    ctx = await createTestApp();
+    server = ctx.app.getHttpServer() as Server;
+  });
+
+  afterAll(async () => {
+    await ctx.close();
+  });
+
+  beforeEach(async () => {
+    await resetDatabase(ctx.db);
+
+    const student = await ctx.db.user.create({
+      data: {
+        telegramId: '1001',
+        telegramUsername: 'student',
+        name: 'Максим Котов',
+      },
+    });
+    const tutor = await ctx.db.user.create({
+      data: {
+        telegramId: '1002',
+        telegramUsername: 'tutor',
+        name: 'Анна Петрова',
+      },
+    });
+    const subject = await ctx.db.subject.create({
+      data: { name: 'Мат. анализ' },
+    });
+    const teacher = await ctx.db.teacher.create({
+      data: { fullName: 'Иванов И.И.', foreignId: 'teacher-ext-1' },
+    });
+
+    studentId = student.id;
+    tutorId = tutor.id;
+    subjectId = subject.id;
+    teacherId = teacher.id;
+    studentToken = ctx.tokenFor(student.id, student.telegramId);
+    tutorToken = ctx.tokenFor(tutor.id, tutor.telegramId);
+  });
+
+  const createRequest = async () => {
+    const response = await request(server)
+      .post('/api/marketplace/requests')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({
+        studentId,
+        subjectId,
+        teacherId,
+        description: 'Нужна помощь с интегралами',
+        budget: 200000,
+      })
+      .expect(201);
+    return body<{ id: string; status: string }>(response);
+  };
+
+  const respond = async (requestId: string) => {
+    const response = await request(server)
+      .post('/api/marketplace/request-responses')
+      .set('Authorization', `Bearer ${tutorToken}`)
+      .send({ tutorId, requestId, message: 'Разберём по шагам', price: 140000 })
+      .expect(201);
+    return body<{ id: string }>(response);
+  };
+
+  it('проводит петлю от заявки до двух отзывов', async () => {
+    const created = await createRequest();
+    expect(created.status).toBe('OPEN');
+
+    const response = await respond(created.id);
+
+    // выбор репетитора закрывает заявку и создаёт сделку
+    await request(server)
+      .patch(`/api/marketplace/request-responses/${response.id}/accept`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+
+    const matched = await ctx.db.request.findUnique({
+      where: { id: created.id },
+    });
+    expect(matched?.status).toBe('MATCHED');
+
+    const deal = await ctx.db.deal.findFirst({
+      where: { requestResponseId: response.id },
+    });
+    expect(deal).not.toBeNull();
+    expect(deal?.price).toBe(140000);
+
+    // одна сторона подтвердила — сделка ещё не закрыта
+    await request(server)
+      .patch(`/api/marketplace/deals/${deal!.id}/complete`)
+      .set('Authorization', `Bearer ${tutorToken}`)
+      .expect(200);
+
+    const halfway = await ctx.db.deal.findUnique({ where: { id: deal!.id } });
+    expect(halfway?.status).not.toBe('COMPLETED');
+    expect(halfway?.tutorConfirmedAt).not.toBeNull();
+
+    // подтвердила вторая — закрылась
+    await request(server)
+      .patch(`/api/marketplace/deals/${deal!.id}/complete`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+
+    const completed = await ctx.db.deal.findUnique({ where: { id: deal!.id } });
+    expect(completed?.status).toBe('COMPLETED');
+
+    // по отзыву с каждой стороны
+    await request(server)
+      .post('/api/reviews')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ dealId: deal!.id, rating: 5, comment: 'Всё разложил по полкам' })
+      .expect(201);
+
+    await request(server)
+      .post('/api/reviews')
+      .set('Authorization', `Bearer ${tutorToken}`)
+      .send({ dealId: deal!.id, rating: 5 })
+      .expect(201);
+
+    const reviews = await ctx.db.review.findMany({
+      where: { dealId: deal!.id },
+    });
+    expect(reviews).toHaveLength(2);
+    // роли выведены сервером, а не присланы клиентом
+    expect(reviews.find((r) => r.authorId === studentId)?.targetRole).toBe(
+      'TUTOR',
+    );
+    expect(reviews.find((r) => r.authorId === tutorId)?.targetRole).toBe(
+      'STUDENT',
+    );
+  });
+
+  it('второй отзыв от того же автора отбивается ограничением схемы', async () => {
+    const created = await createRequest();
+    const response = await respond(created.id);
+    await request(server)
+      .patch(`/api/marketplace/request-responses/${response.id}/accept`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+
+    const deal = await ctx.db.deal.findFirst({
+      where: { requestResponseId: response.id },
+    });
+    await ctx.db.deal.update({
+      where: { id: deal!.id },
+      data: { status: 'COMPLETED' },
+    });
+
+    await request(server)
+      .post('/api/reviews')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ dealId: deal!.id, rating: 5 })
+      .expect(201);
+
+    await request(server)
+      .post('/api/reviews')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ dealId: deal!.id, rating: 4 })
+      .expect(400);
+  });
+
+  it('закрытая заявка выпадает из ленты, но остаётся у автора', async () => {
+    const created = await createRequest();
+
+    await request(server)
+      .patch(`/api/marketplace/requests/${created.id}/close`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+
+    const feed = await request(server)
+      .get('/api/marketplace/requests')
+      .set('Authorization', `Bearer ${tutorToken}`)
+      .expect(200);
+    expect(body<unknown[]>(feed)).toHaveLength(0);
+
+    // контракт разный: лента отдаёт массив, «мои» — объект { items, total }.
+    // фронт это нормализует, тест фиксирует фактическую форму
+    const mine = await request(server)
+      .get('/api/marketplace/requests/my')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    const { items } = body<{ items: { status: string }[] }>(mine);
+    expect(items).toHaveLength(1);
+    expect(items[0].status).toBe('CLOSED');
+  });
+});

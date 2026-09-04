@@ -1,29 +1,60 @@
 # Testing Status
 
-What exists today, and the conventions the suite follows.
+What the suite covers today, and the conventions it follows.
 
-## Current state
+## Unit tests (142, no database needed)
 
-- **6 unit suites, 87 tests**, all passing (`pnpm test`). They cover the security-critical and marketplace-invariant paths:
+`pnpm test` — every suite mocks the Prisma layer, so it runs anywhere.
 
-  | Suite                                                 | What it pins down                                                                                      |
-  | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-  | `src/modules/auth/auth.service.spec.ts`               | `initData` signature, 24h `auth_date` window, fail-closed without a bot token, dev-login gated to dev  |
-  | `src/modules/marketplace/deals/deals.service.spec.ts` | Participant-only creation/read/transitions, response-pair matching, two-sided confirmation, auto-close |
-  | `src/modules/reviews/reviews.service.spec.ts`         | Completed-deal-only reviews, server-derived target/role, one review per author, reply permissions      |
-  | `src/modules/marketplace/request-responses/…spec.ts`  | Ownership on create/update/delete, accept creates the deal, price fallback to the request budget       |
-  | `src/modules/marketplace/service-responses/…spec.ts`  | Own-service and duplicate guards, accept/reject restricted to the service owner, status not client-set |
-  | `src/modules/users/users.service.spec.ts`             | Public projections hide `telegramId`/`balance`/notification settings; balance only in your own stats   |
+| Suite                                           | What it pins down                                                                                                                                     |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth/auth.service.spec.ts`                     | `initData` signature, 24h `auth_date` window, fail-closed without a bot token, dev-login only in `development`                                        |
+| `marketplace/deals/deals.service.spec.ts`       | Participant-only access, response-pair matching, two-sided confirmation, auto-confirm (never before the deal's deadline), reopen, cancellation record |
+| `marketplace/requests/requests.service.spec.ts` | Creation validation, feed shows only OPEN by default, close rejects pending responses, reopen is a new publication, ownership on edit                 |
+| `marketplace/request-responses/…spec.ts`        | Ownership and duplicate guards, accepting matches the request, closes the others and creates the deal at the right price                              |
+| `marketplace/service-responses/…spec.ts`        | Own-service and duplicate guards, accept/reject restricted to the service owner, status is not client-writable                                        |
+| `marketplace/services/services.service.spec.ts` | ACTIVE-only showcase, price filters, own/responded flags, tutor reputation from reviews, delete blocked by responses or deals                         |
+| `reviews/reviews.service.spec.ts`               | Completed-deal-only, target and role derived server-side, one review per author per deal, reply permissions, reputation split by role                 |
+| `users/users.service.spec.ts`                   | Public projections hide `telegramId`/`balance`/notification settings; balance only in your own stats                                                  |
 
-- Tooling: Jest + ts-jest (config in `package.json`: `rootDir: src`, `testRegex: .*\.spec\.ts$`, `moduleNameMapper` for the `@common`/`@database`/`@modules` aliases). Scripts: `test`, `test:watch`, `test:cov`, `test:e2e`.
-- **No database is required** — every suite mocks the Prisma layer, so `pnpm test` runs anywhere.
-- Not covered yet: `services`/`requests` listing services, education, parser, notifications, and any HTTP-level (e2e) tests. Verify changes there by lint, build, and exercising the endpoints.
+Shared mocks live in **`src/test-support/mocks.ts`** — that directory is excluded from the production build (`tsconfig.build.json`), which is why the helpers do not sit under `src/common`:
+
+- `createDatabaseMock()` — every Prisma model plus a transparent `$transaction` (both the callback and the array form).
+- `createNotificationMock()` — an explicit object, not a Proxy: a Proxy answers `then` with a function and Nest then treats the provider as a promise and hangs on `compile()`.
+- `firstCallArg<T>()` with the `ReadArg`/`WriteArg` shapes — typed access to call arguments.
+- `expectBusinessError(fn, { code, status })` — asserts the error code and HTTP status instead of the Russian message.
+
+Jest maps the `@common` / `@config` / `@database` / `@modules` aliases via `moduleNameMapper` in `package.json`.
+
+## E2E (13 tests, real Postgres)
+
+`pnpm run test:e2e` boots the whole app through `AppModule` with the same pipeline as `main.ts` (global `/api` prefix, `ValidationPipe` with whitelist + forbidNonWhitelisted, `GlobalExceptionFilter`) and drives it over HTTP with supertest against a real database.
+
+- `test/marketplace.e2e-spec.ts` — the loop end to end: request → response → accept → deal → both sides confirm → one review from each. Also that a closed request drops out of the feed but stays with its author, and that a second review from the same author is refused by the schema's composite unique key.
+- `test/pipeline.e2e-spec.ts` — the parts unit tests cannot see: the global guard (401 without a token, 401 for a token whose user was deleted), the success envelope the frontend's `apiClient` unwraps, `forbidNonWhitelisted` rejecting extra fields (this is what keeps the frontend from sending `authorId` to `/reviews` again), `ParseUUIDPipe`, and error mapping to 403/404 with a body.
+
+**Setup.** E2E needs its own database — the suite truncates every table before each test, so never point it at a working database.
+
+```bash
+createdb studylink_test                 # or use the postgres service from docker-compose
+export DATABASE_URL_TEST="postgresql://postgres:postgres@localhost:5432/studylink_test"
+pnpm run test:e2e:setup                 # applies migrations to the test database
+pnpm run test:e2e
+```
+
+`test/env.ts` defaults `DATABASE_URL_TEST` to `postgresql://postgres:postgres@localhost:5432/studylink_test` and forces `NODE_ENV=test`; it also clears `TELEGRAM_BOT_TOKEN`, so notifications go nowhere.
+
+## Not covered yet
+
+- Parser, notifications delivery and the education module have no tests.
+- Deal cancellation, reopen and the auto-confirm sweep are covered by unit tests only — no e2e walks those over HTTP yet.
+- Response shapes are inconsistent and e2e records that as fact rather than fixing it: `GET /marketplace/requests` returns an array, `GET /marketplace/requests/my` returns `{ items, total }`. The frontend normalizes both.
+- The frontend has its own suite (vitest) — see the `study-link` repository.
 
 ## Conventions
 
 - **Unit tests** live next to the code: `src/modules/reviews/reviews.service.spec.ts`. Test services, not controllers; mock `DatabaseService` and `NotificationService` via Nest's `Test.createTestingModule` with provider overrides.
-- **Shared mocks** live in `src/test-support/mocks.ts`: `createPrismaMock()` (a jest-mocked model per Prisma table plus a pass-through `$transaction`), `createNotificationMock()`, and `expectBusinessError()`. That folder is excluded from the production build (`tsconfig.build.json`).
 - **E2E tests** go under `test/` (the `test:e2e` script expects `test/jest-e2e.json`) and use supertest against a compiled app instance.
 - Never run tests against a real/shared database — use a dedicated local test database or mock the Prisma layer.
-- Do not assert on user-facing Russian message strings — assert on status codes, error codes (`NOT_FOUND`, `FORBIDDEN`), and data shapes, so texts can change freely. `expectBusinessError(fn, { code, status })` does exactly this.
+- Do not assert on user-facing Russian message strings — assert on status codes, error codes (`NOT_FOUND`, `FORBIDDEN`), and data shapes, so texts can change freely. `expectBusinessError` does exactly this.
 - Jest's matchers are typed as `any`, so `eslint.config.mjs` turns the `no-unsafe-*` rules off for `**/*.spec.ts` — no `eslint-disable` comments needed in tests.

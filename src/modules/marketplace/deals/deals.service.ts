@@ -37,8 +37,32 @@ export interface DealWithRelations {
  * Сколько ждём вторую сторону, прежде чем закрыть сделку автоматически.
  * Без этого срока сторона, подтвердившая первой, оказывается заложником
  * молчания второй: сделка висит, отзыв не открывается.
+ *
+ * Отсчёт идёт от подтверждения ИЛИ от дедлайна сделки — что позже. Работа
+ * бывает длинной (диплом пишут месяцами), и закрывать её раньше собственного
+ * срока нельзя, даже если кто-то отметился первым.
  */
-const AUTO_CONFIRM_DAYS = 3;
+const AUTO_CONFIRM_DAYS = 7;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Момент, когда сделка закроется без второй стороны (null — таймер не идёт). */
+function autoConfirmAt(deal: {
+  status: string;
+  deadline?: Date | null;
+  studentConfirmedAt?: Date | null;
+  tutorConfirmedAt?: Date | null;
+}): Date | null {
+  if (deal.status === 'COMPLETED' || deal.status === 'CANCELLED') return null;
+
+  const confirmed = deal.studentConfirmedAt ?? deal.tutorConfirmedAt;
+  const bothConfirmed = !!deal.studentConfirmedAt && !!deal.tutorConfirmedAt;
+  if (!confirmed || bothConfirmed) return null;
+
+  const from =
+    deal.deadline && deal.deadline > confirmed ? deal.deadline : confirmed;
+  return new Date(from.getTime() + AUTO_CONFIRM_DAYS * DAY_MS);
+}
 
 @Injectable()
 export class DealsService extends BaseService {
@@ -196,8 +220,13 @@ export class DealsService extends BaseService {
       }),
       this.db.deal.count({ where }),
     ]);
+
+    const withTimer = items.map((item) => ({
+      ...item,
+      autoConfirmAt: autoConfirmAt(item),
+    }));
     return {
-      items,
+      items: withTimer,
       total,
       page: pagination.page,
       limit: pagination.limit,
@@ -333,6 +362,67 @@ export class DealsService extends BaseService {
   }
 
   /**
+   * «Работа ещё не готова»: снимает подтверждение второй стороны и
+   * останавливает таймер авто-закрытия. Нужно для длинной работы — диплом
+   * пишут месяцами, и преждевременное «сдал» не должно закрывать сделку.
+   */
+  async reopen(id: string, userId: string) {
+    const deal = await this.ensureDealParticipant(id, userId);
+    if (
+      deal.status === DEAL_STATUS.COMPLETED ||
+      deal.status === DEAL_STATUS.CANCELLED
+    ) {
+      throw new BusinessException('Сделка уже завершена или отменена');
+    }
+
+    const isStudent = deal.studentId === userId;
+    const theirConfirmedAt = isStudent
+      ? deal.tutorConfirmedAt
+      : deal.studentConfirmedAt;
+    if (!theirConfirmedAt) {
+      throw new BusinessException(
+        'Вторая сторона ещё не подтверждала выполнение',
+      );
+    }
+
+    const updated = await this.db.deal.update({
+      where: { id },
+      data: {
+        ...(isStudent
+          ? { tutorConfirmedAt: null }
+          : { studentConfirmedAt: null }),
+        updatedAt: new Date(),
+      },
+      include: {
+        student: true,
+        tutor: true,
+        subject: true,
+        teacher: true,
+        serviceResponse: true,
+        requestResponse: {
+          include: {
+            request: {
+              include: { student: true, subject: true, teacher: true },
+            },
+          },
+        },
+        reviews: true,
+      },
+    });
+
+    const actor = isStudent ? deal.student : deal.tutor;
+    void this.notificationService.notifyDealReopened({
+      recipientUserId: isStudent ? deal.tutorId : deal.studentId,
+      actorName: actor?.name ?? 'Участник',
+      actorUserId: userId,
+      dealId: id,
+      subjectName: deal.subject?.name,
+    });
+
+    return updated;
+  }
+
+  /**
    * Подтверждение выполнения со своей стороны.
    *
    * Сделка закрывается только когда отметились обе стороны — иначе рейтинг
@@ -407,9 +497,8 @@ export class DealsService extends BaseService {
    * чтобы не тащить в проект планировщик ради одной операции.
    */
   private async applyAutoConfirmations(): Promise<void> {
-    const deadline = new Date(
-      Date.now() - AUTO_CONFIRM_DAYS * 24 * 60 * 60 * 1000,
-    );
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - AUTO_CONFIRM_DAYS * DAY_MS);
     try {
       await this.db.deal.updateMany({
         where: {
@@ -420,9 +509,17 @@ export class DealsService extends BaseService {
               DEAL_STATUS.IN_PROGRESS,
             ],
           },
-          OR: [
-            { studentConfirmedAt: { lt: deadline }, tutorConfirmedAt: null },
-            { tutorConfirmedAt: { lt: deadline }, studentConfirmedAt: null },
+          AND: [
+            // одна сторона подтвердила и молчание длится дольше срока
+            {
+              OR: [
+                { studentConfirmedAt: { lt: cutoff }, tutorConfirmedAt: null },
+                { tutorConfirmedAt: { lt: cutoff }, studentConfirmedAt: null },
+              ],
+            },
+            // но не раньше собственного срока сделки: длинную работу
+            // нельзя закрыть до дедлайна
+            { OR: [{ deadline: null }, { deadline: { lt: cutoff } }] },
           ],
         },
         data: { status: DEAL_STATUS.COMPLETED, updatedAt: new Date() },

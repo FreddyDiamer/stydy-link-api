@@ -252,11 +252,32 @@ export class RequestResponsesService extends BaseService {
     if (price == null || price < 100) {
       throw new BusinessException('Не указана цена для сделки');
     }
+    // остальные откликнувшиеся должны узнать, что выбрали не их
+    const otherPending = await this.db.requestResponse.findMany({
+      where: {
+        requestId: response.requestId,
+        id: { not: id },
+        status: 'PENDING',
+      },
+      select: { id: true, tutorId: true },
+    });
+
     await this.db.$transaction(async (tx) => {
       await tx.requestResponse.update({
         where: { id },
         data: { status: 'ACCEPTED', updatedAt: new Date() },
       });
+      // заявка выпадает из ленты и перестаёт собирать отклики
+      await tx.request.update({
+        where: { id: response.requestId },
+        data: { status: 'MATCHED', updatedAt: new Date() },
+      });
+      if (otherPending.length) {
+        await tx.requestResponse.updateMany({
+          where: { id: { in: otherPending.map((r) => r.id) } },
+          data: { status: 'REJECTED', updatedAt: new Date() },
+        });
+      }
       await tx.deal.create({
         data: {
           studentId: response.request.studentId,
@@ -278,6 +299,17 @@ export class RequestResponsesService extends BaseService {
       subject?: { name: string };
       student?: { name: string };
     };
+
+    for (const other of otherPending) {
+      void this.notificationService.notifyRequestResponseRejected({
+        recipientUserId: other.tutorId,
+        actorName: req.student?.name ?? 'Студент',
+        actorUserId: response.request.studentId,
+        responseId: other.id,
+        subjectName: req.subject?.name,
+      });
+    }
+
     void this.notificationService.notifyRequestResponseAccepted({
       recipientUserId: response.tutorId,
       actorName: req.student?.name ?? 'Студент',

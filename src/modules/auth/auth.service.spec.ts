@@ -5,9 +5,9 @@ import * as crypto from 'crypto';
 import { AuthService } from './auth.service';
 import { DatabaseService } from '../../database/database.service';
 import {
-  createPrismaMock,
+  createDatabaseMock,
   expectBusinessError,
-  PrismaMock,
+  DatabaseMock,
 } from '../../test-support/mocks';
 
 const BOT_TOKEN = 'test-bot-token';
@@ -59,7 +59,7 @@ function buildInitData(
 
 describe('AuthService', () => {
   let service: AuthService;
-  let db: PrismaMock;
+  let db: DatabaseMock;
   let config: { get: jest.Mock };
 
   const configValues = (nodeEnv: string, botToken?: string) => ({
@@ -75,7 +75,7 @@ describe('AuthService', () => {
   };
 
   beforeEach(async () => {
-    db = createPrismaMock();
+    db = createDatabaseMock();
     config = { get: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({

@@ -3,11 +3,18 @@ import { DealsService } from './deals.service';
 import { DatabaseService } from '../../../database/database.service';
 import { NotificationService } from '../../notifications/notification.service';
 import {
+  createDatabaseMock,
   createNotificationMock,
-  createPrismaMock,
   expectBusinessError,
-  PrismaMock,
+  firstCallArg,
+  type DatabaseMock,
+  type WriteArg,
 } from '../../../test-support/mocks';
+
+/** Аргумент авто-подтверждения: молчание второй стороны И дедлайн сделки */
+interface AutoConfirmArg {
+  where: { AND: { OR: Record<string, unknown>[] }[] };
+}
 
 const STUDENT = 'student-1';
 const TUTOR = 'tutor-1';
@@ -41,11 +48,11 @@ const createDto = (overrides: Record<string, unknown> = {}) => ({
 
 describe('DealsService', () => {
   let service: DealsService;
-  let db: PrismaMock;
+  let db: DatabaseMock;
   let notifications: ReturnType<typeof createNotificationMock>;
 
   beforeEach(async () => {
-    db = createPrismaMock();
+    db = createDatabaseMock();
     notifications = createNotificationMock();
 
     const moduleRef = await Test.createTestingModule({
@@ -275,24 +282,105 @@ describe('DealsService', () => {
       });
     });
 
-    it('закрывает сделки, где вторая сторона молчит дольше трёх дней', async () => {
+    it('закрывает сделку, где вторая сторона молчит дольше срока', async () => {
       db.deal.findMany.mockResolvedValue([]);
       db.deal.count.mockResolvedValue(0);
 
       await service.findAll({ page: 1, limit: 10, skip: 0 }, {}, STUDENT);
 
-      expect(db.deal.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ status: 'COMPLETED' }),
-        }),
+      const { where } = firstCallArg<AutoConfirmArg>(db.deal.updateMany);
+      const [silence] = where.AND;
+      expect(silence.OR).toHaveLength(2);
+      expect(silence.OR[0].tutorConfirmedAt).toBeNull();
+    });
+
+    it('не закрывает раньше собственного дедлайна сделки', async () => {
+      db.deal.findMany.mockResolvedValue([]);
+      db.deal.count.mockResolvedValue(0);
+
+      await service.findAll({ page: 1, limit: 10, skip: 0 }, {}, STUDENT);
+
+      const { where } = firstCallArg<AutoConfirmArg>(db.deal.updateMany);
+      const [, deadlineGuard] = where.AND;
+      // длинную работу нельзя закрыть до её собственного срока
+      expect(deadlineGuard.OR).toEqual([
+        { deadline: null },
+        { deadline: { lt: expect.any(Date) as unknown } },
+      ]);
+    });
+
+    it('отдаёт фронту момент авто-закрытия', async () => {
+      const confirmedAt = new Date('2026-06-24T00:00:00.000Z');
+      db.deal.findMany.mockResolvedValue([
+        baseDeal({ studentConfirmedAt: confirmedAt, deadline: null }),
+      ]);
+      db.deal.count.mockResolvedValue(1);
+
+      const result = await service.findAll(
+        { page: 1, limit: 10, skip: 0 },
+        {},
+        STUDENT,
       );
-      const args = db.deal.updateMany.mock.calls[0][0] as {
-        where: { OR: Array<Record<string, { lt?: Date } | null>> };
-      };
-      const cutoff = args.where.OR[0].studentConfirmedAt as { lt: Date };
-      const daysAgo =
-        (Date.now() - cutoff.lt.getTime()) / (24 * 60 * 60 * 1000);
-      expect(daysAgo).toBeCloseTo(3, 1);
+      const [item] = result.items as unknown as { autoConfirmAt: Date }[];
+
+      const expected = new Date(confirmedAt);
+      expected.setDate(expected.getDate() + 7);
+      expect(item.autoConfirmAt).toEqual(expected);
+    });
+
+    it('таймер не идёт, когда подтвердили обе стороны', async () => {
+      db.deal.findMany.mockResolvedValue([
+        baseDeal({
+          studentConfirmedAt: new Date('2026-06-24'),
+          tutorConfirmedAt: new Date('2026-06-25'),
+        }),
+      ]);
+      db.deal.count.mockResolvedValue(1);
+
+      const result = await service.findAll(
+        { page: 1, limit: 10, skip: 0 },
+        {},
+        STUDENT,
+      );
+      const [item] = result.items as unknown as {
+        autoConfirmAt: Date | null;
+      }[];
+
+      expect(item.autoConfirmAt).toBeNull();
+    });
+  });
+
+  describe('работа ещё не готова', () => {
+    it('снимает подтверждение второй стороны', async () => {
+      db.deal.findUnique.mockResolvedValue(
+        baseDeal({ tutorConfirmedAt: new Date('2026-06-24') }),
+      );
+      db.deal.update.mockResolvedValue(baseDeal());
+
+      await service.reopen('deal-1', STUDENT);
+
+      const { data } = firstCallArg<WriteArg>(db.deal.update);
+      expect(data.tutorConfirmedAt).toBeNull();
+    });
+
+    it('нечего снимать, если вторая сторона не подтверждала', async () => {
+      db.deal.findUnique.mockResolvedValue(baseDeal());
+
+      await expectBusinessError(() => service.reopen('deal-1', STUDENT), {
+        status: 400,
+      });
+      expect(db.deal.update).not.toHaveBeenCalled();
+    });
+
+    it('не пускает постороннего', async () => {
+      db.deal.findUnique.mockResolvedValue(
+        baseDeal({ tutorConfirmedAt: new Date('2026-06-24') }),
+      );
+
+      await expectBusinessError(() => service.reopen('deal-1', OUTSIDER), {
+        code: 'FORBIDDEN',
+        status: 403,
+      });
     });
   });
 

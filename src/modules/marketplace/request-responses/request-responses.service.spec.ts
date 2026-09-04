@@ -4,10 +4,12 @@ import { RequestResponsesService } from './request-responses.service';
 import { DatabaseService } from '../../../database/database.service';
 import { NotificationService } from '../../notifications/notification.service';
 import {
+  createDatabaseMock,
   createNotificationMock,
-  createPrismaMock,
   expectBusinessError,
-  PrismaMock,
+  firstCallArg,
+  type DatabaseMock,
+  type WriteArg,
 } from '../../../test-support/mocks';
 
 const STUDENT = 'student-1';
@@ -41,11 +43,11 @@ const response = (overrides: Record<string, unknown> = {}) => ({
 
 describe('RequestResponsesService', () => {
   let service: RequestResponsesService;
-  let db: PrismaMock;
+  let db: DatabaseMock;
   let notifications: ReturnType<typeof createNotificationMock>;
 
   beforeEach(async () => {
-    db = createPrismaMock();
+    db = createDatabaseMock();
     notifications = createNotificationMock();
 
     const moduleRef = await Test.createTestingModule({
@@ -64,6 +66,7 @@ describe('RequestResponsesService', () => {
     db.requestResponse.create.mockResolvedValue(response());
     db.requestResponse.findUnique.mockResolvedValue(response());
     db.deal.findFirst.mockResolvedValue(null);
+    db.requestResponse.findMany.mockResolvedValue([]);
   });
 
   describe('создание отклика', () => {
@@ -181,6 +184,56 @@ describe('RequestResponsesService', () => {
           }),
         }),
       );
+    });
+
+    it('переводит заявку в MATCHED — она перестаёт собирать отклики', async () => {
+      db.deal.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'deal-1', price: 200000 });
+
+      await service.accept('rr-1', asUser(STUDENT));
+
+      expect(db.request.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'request-1' },
+          data: expect.objectContaining({ status: 'MATCHED' }) as unknown,
+        }),
+      );
+    });
+
+    it('отклоняет остальные отклики и уведомляет их авторов', async () => {
+      db.requestResponse.findMany.mockResolvedValue([
+        { id: 'other-1', tutorId: 'tutor-2' },
+        { id: 'other-2', tutorId: 'tutor-3' },
+      ]);
+      db.deal.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'deal-1', price: 200000 });
+
+      await service.accept('rr-1', asUser(STUDENT));
+
+      expect(db.requestResponse.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ['other-1', 'other-2'] } },
+          data: expect.objectContaining({ status: 'REJECTED' }) as unknown,
+        }),
+      );
+      expect(notifications.notifyRequestResponseRejected).toHaveBeenCalledTimes(
+        2,
+      );
+    });
+
+    it('цена сделки берётся из отклика', async () => {
+      db.deal.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'deal-1', price: 200000 });
+
+      await service.accept('rr-1', asUser(STUDENT));
+
+      const { data } = firstCallArg<WriteArg>(db.deal.create);
+      expect(data.price).toBe(200000);
+      expect(data.studentId).toBe(STUDENT);
+      expect(data.tutorId).toBe(TUTOR);
     });
 
     it('доступно только автору заявки', async () => {
