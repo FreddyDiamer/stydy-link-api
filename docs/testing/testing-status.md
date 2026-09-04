@@ -24,10 +24,43 @@ What exists today, and the conventions to follow once tests are introduced.
   exercising affected endpoints against a local dev server (`/auth/dev/login` gives a token
   without Telegram).
 
+## E2E (13 tests, real Postgres)
+
+`pnpm run test:e2e` boots the whole app through `AppModule` with the same pipeline as
+`main.ts` (global `/api` prefix, `ValidationPipe` with whitelist + forbidNonWhitelisted,
+`GlobalExceptionFilter`) and drives it over HTTP with supertest against a real database.
+
+- `test/marketplace.e2e-spec.ts` — the loop end to end: request → response → accept →
+  deal → both sides confirm → one review from each. Also that a closed request drops out
+  of the feed but stays with its author, and that a second review from the same author is
+  refused by the schema's composite unique key.
+- `test/pipeline.e2e-spec.ts` — the parts unit tests cannot see: the global guard (401
+  without a token, 401 for a token whose user was deleted), the success envelope the
+  frontend's `apiClient` unwraps, `forbidNonWhitelisted` rejecting extra fields (this is
+  what keeps the frontend from sending `authorId` to `/reviews` again), `ParseUUIDPipe`,
+  and error mapping to 403/404 with a body.
+
+**Setup.** E2E needs its own database — the suite truncates every table before each test,
+so never point it at a working database.
+
+```bash
+createdb studylink_test                 # or use the postgres service from docker-compose
+export DATABASE_URL_TEST="postgresql://postgres:postgres@localhost:5432/studylink_test"
+pnpm run test:e2e:setup                 # applies migrations to the test database
+pnpm run test:e2e
+```
+
+`test/env.ts` defaults `DATABASE_URL_TEST` to `postgresql://postgres:postgres@localhost:5432/studylink_test`
+and forces `NODE_ENV=test`; it also clears `TELEGRAM_BOT_TOKEN`, so notifications go nowhere.
+
 ## Not covered yet
 
-- No e2e tests: nothing runs against a real HTTP layer or database.
 - Parser, notifications delivery and the education module have no tests.
+- Deal cancellation, reopen and the auto-confirm sweep are covered by unit tests only —
+  no e2e walks those over HTTP yet.
+- Response shapes are inconsistent and e2e records that as fact rather than fixing it:
+  `GET /marketplace/requests` returns an array, `GET /marketplace/requests/my` returns
+  `{ items, total }`. The frontend normalizes both.
 - The frontend has its own suite (vitest) — see the `study-link` repository.
 
 ## Conventions for future tests
