@@ -50,27 +50,32 @@ export class CreateServiceDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({
+  // Мини-апп публикует услугу без этих полей; в схеме есть дефолты (1 занятие, 60 минут)
+  @ApiPropertyOptional({
     description: 'Количество занятий для подготовки студента',
     example: 10,
     minimum: 1,
     maximum: 200,
+    default: 1,
   })
+  @IsOptional()
   @IsInt()
   @Min(1, { message: 'Минимум 1 занятие' })
   @Max(200, { message: 'Максимум 200 занятий' })
-  lessonsCount: number;
+  lessonsCount?: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Длительность одного занятия в минутах',
     example: 60,
     minimum: 15,
     maximum: 180,
+    default: 60,
   })
+  @IsOptional()
   @IsInt()
   @Min(15, { message: 'Минимум 15 минут' })
   @Max(180, { message: 'Максимум 180 минут' })
-  lessonDurationMinutes: number;
+  lessonDurationMinutes?: number;
 
   @ApiPropertyOptional({
     description: 'Статус услуги',

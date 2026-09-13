@@ -26,6 +26,7 @@ Available: `BusinessException` (400), `NotFoundException` (404), `ValidationExce
 - DTOs are classes with `class-validator` decorators plus `@ApiProperty`/`@ApiPropertyOptional` for Swagger; they live in each module's `dto/` folder
 - The global `ValidationPipe` runs with `whitelist` + `forbidNonWhitelisted` — every accepted field must be declared in the DTO
 - List endpoints take `PaginationDto` from `@common` (`page`, `limit` ≤ 100, computed `skip`) and return `PaginatedResult<T>`
+- A list endpoint takes **one** `@Query()` object: the filter DTO extends `PaginationDto` (see `UserFilterDto`, `DealListQueryDto`). Two `@Query()` DTOs on one method fail `forbidNonWhitelisted` — each is validated against the whole query string
 - UUID path params are validated with `ParseUUIDPipe`
 
 ## Money

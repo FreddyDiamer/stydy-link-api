@@ -87,6 +87,15 @@ describe('Конвейер запросов (e2e)', () => {
         .expect(400);
     });
 
+    it('пагинация и фильтр приходят одним query — page/limit не отбиваются', async () => {
+      // раньше два @Query() на методе валили любой ?page= как «лишнее поле»
+      const response = await request(server)
+        .get('/api/education/teacher-subjects?page=1&limit=100')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(body<{ items: unknown[] }>(response).items).toEqual([]);
+    });
+
     it('проверяет диапазон оценки', async () => {
       await request(server)
         .post('/api/reviews')

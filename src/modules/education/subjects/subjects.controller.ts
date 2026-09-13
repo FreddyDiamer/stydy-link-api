@@ -2,7 +2,7 @@ import { Controller, Get, Param, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SubjectsService } from './subjects.service';
 import { SubjectResponseDto, SubjectFilterDto } from './dto/subject.dto';
-import { PaginationDto, ApiSuccessResponse } from '@common';
+import { ApiSuccessResponse } from '@common';
 
 /**
  * Справочник предметов только для чтения: данные наполняет парсер
@@ -21,11 +21,8 @@ export class SubjectsController {
       'Получить список предметов университета с фильтрацией и пагинацией',
   })
   @ApiSuccessResponse(SubjectResponseDto)
-  async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: SubjectFilterDto,
-  ) {
-    return this.subjectsService.findAll(paginationDto, filterDto);
+  async findAll(@Query() query: SubjectFilterDto) {
+    return this.subjectsService.findAll(query, query);
   }
 
   @Get('active')

@@ -11,6 +11,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
+import { PaginationDto } from '@common';
 
 export class CreateReviewDto {
   @ApiProperty({
@@ -60,7 +61,8 @@ export class SetReviewReplyDto {
   reply?: string | null;
 }
 
-export class ReviewFilterDto {
+/** Пагинация внутри фильтра: два @Query() на одном методе не проходят forbidNonWhitelisted */
+export class ReviewFilterDto extends PaginationDto {
   @ApiPropertyOptional({
     description: 'Фильтр по ID автора отзыва',
     example: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',

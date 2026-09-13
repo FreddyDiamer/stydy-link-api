@@ -16,7 +16,7 @@ import {
   UserFilterDto,
   UpdateGroupDto,
 } from './dto/user.dto';
-import { PaginationDto, CurrentUser, ApiSuccessResponse } from '@common';
+import { CurrentUser, ApiSuccessResponse } from '@common';
 
 @ApiTags('Users')
 @Controller('users')
@@ -31,11 +31,8 @@ export class UsersController {
       'Получить список публичных профилей с фильтрацией и пагинацией',
   })
   @ApiSuccessResponse(UserResponseDto)
-  async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: UserFilterDto,
-  ) {
-    return this.usersService.findAll(paginationDto, filterDto);
+  async findAll(@Query() query: UserFilterDto) {
+    return this.usersService.findAll(query, query);
   }
 
   @Get('me')
@@ -54,11 +51,8 @@ export class UsersController {
     description: 'Получить список пользователей которые предоставляют услуги',
   })
   @ApiSuccessResponse(UserResponseDto)
-  async findUsersWithServices(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: UserFilterDto,
-  ) {
-    return this.usersService.findAll(paginationDto, filterDto);
+  async findUsersWithServices(@Query() query: UserFilterDto) {
+    return this.usersService.findAll(query, query);
   }
 
   @Get('with-requests')
@@ -67,11 +61,8 @@ export class UsersController {
     description: 'Получить список пользователей которые создают заявки',
   })
   @ApiSuccessResponse(UserResponseDto)
-  async findUsersWithRequests(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: UserFilterDto,
-  ) {
-    return this.usersService.findAll(paginationDto, filterDto);
+  async findUsersWithRequests(@Query() query: UserFilterDto) {
+    return this.usersService.findAll(query, query);
   }
 
   @Get(':id')

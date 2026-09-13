@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaginationDto } from '@common';
 
 /**
  * Поля, которые пользователь может менять у себя сам.
@@ -50,7 +51,8 @@ export class UpdateUserDto {
   notificationPreferences?: Record<string, boolean>;
 }
 
-export class UserFilterDto {
+/** Пагинация внутри фильтра: два @Query() на одном методе не проходят forbidNonWhitelisted */
+export class UserFilterDto extends PaginationDto {
   @ApiPropertyOptional({
     description: 'Filter by active status',
     example: true,

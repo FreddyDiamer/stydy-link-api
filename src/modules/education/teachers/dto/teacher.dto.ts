@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
-import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { PaginationDto } from '@common';
 
 export class CreateTeacherDto {
   @ApiProperty({
@@ -22,7 +22,8 @@ export class CreateTeacherDto {
 
 export class UpdateTeacherDto extends PartialType(CreateTeacherDto) {}
 
-export class TeacherFilterDto {
+/** Пагинация внутри фильтра: два @Query() на одном методе не проходят forbidNonWhitelisted */
+export class TeacherFilterDto extends PaginationDto {
   @ApiPropertyOptional({
     description: 'Поиск по имени преподавателя',
     example: 'Иванов',

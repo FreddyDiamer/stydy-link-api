@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { UsersService } from './users.service';
+import { UserFilterDto } from './dto/user.dto';
 import { DatabaseService } from '../../database/database.service';
 import {
   createDatabaseMock,
@@ -34,7 +35,9 @@ describe('UsersService', () => {
       db.user.findMany.mockResolvedValue([]);
       db.user.count.mockResolvedValue(0);
 
-      await service.findAll({ page: 1, limit: 10, skip: 0 }, {});
+      // пагинация и фильтр — один query-объект
+      const query = { page: 1, limit: 10, skip: 0 } as UserFilterDto;
+      await service.findAll(query, query);
 
       const args = db.user.findMany.mock.calls[0][0] as {
         select: Record<string, unknown>;

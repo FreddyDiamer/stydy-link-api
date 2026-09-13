@@ -2,7 +2,7 @@ import { Controller, Get, Param, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TeachersService } from './teachers.service';
 import { TeacherResponseDto, TeacherFilterDto } from './dto/teacher.dto';
-import { PaginationDto, ApiSuccessResponse } from '@common';
+import { ApiSuccessResponse } from '@common';
 
 /**
  * Справочник преподавателей только для чтения: данные наполняет парсер
@@ -21,11 +21,8 @@ export class TeachersController {
       'Получить список преподавателей университета с фильтрацией и пагинацией',
   })
   @ApiSuccessResponse(TeacherResponseDto)
-  async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: TeacherFilterDto,
-  ) {
-    return this.teachersService.findAll(paginationDto, filterDto);
+  async findAll(@Query() query: TeacherFilterDto) {
+    return this.teachersService.findAll(query, query);
   }
 
   @Get('active')

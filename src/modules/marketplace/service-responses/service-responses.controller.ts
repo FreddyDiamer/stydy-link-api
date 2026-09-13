@@ -17,12 +17,7 @@ import {
   ServiceResponseResponseDto,
   ServiceResponseFilterDto,
 } from './dto/service-response.dto';
-import {
-  PaginationDto,
-  ApiSuccessResponse,
-  CurrentUser,
-  ForbiddenException,
-} from '@common';
+import { ApiSuccessResponse, CurrentUser, ForbiddenException } from '@common';
 import { User } from '@prisma/client';
 
 @ApiTags('Marketplace - Service Responses')
@@ -58,11 +53,8 @@ export class ServiceResponsesController {
     description: 'Получить список откликов студентов на услуги с фильтрацией',
   })
   @ApiSuccessResponse(ServiceResponseResponseDto)
-  async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: ServiceResponseFilterDto,
-  ) {
-    return this.serviceResponsesService.findAll(paginationDto, filterDto);
+  async findAll(@Query() query: ServiceResponseFilterDto) {
+    return this.serviceResponsesService.findAll(query, query);
   }
 
   @Get('my')

@@ -1,6 +1,7 @@
 import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { PaginationDto } from '@common';
 
 export class CreateSubjectDto {
   @ApiProperty({
@@ -23,18 +24,19 @@ export class CreateSubjectDto {
 
 export class UpdateSubjectDto extends PartialType(CreateSubjectDto) {}
 
-export class SubjectFilterDto {
+/** Пагинация внутри фильтра: два @Query() на одном методе не проходят forbidNonWhitelisted */
+export class SubjectFilterDto extends PaginationDto {
   @ApiPropertyOptional({
     description: 'Фильтр по статусу активности',
     example: true,
   })
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
       return value === 'true';
     }
-    return value;
+    return value as boolean | undefined;
   })
   isActive?: boolean;
 

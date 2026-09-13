@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { PaginationDto } from '@common';
 // Вместо enum ResponseStatus используем string union type
 export type ResponseStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 
@@ -87,7 +88,8 @@ export class UpdateServiceResponseDto extends PartialType(
   CreateServiceResponseDto,
 ) {}
 
-export class ServiceResponseFilterDto {
+/** Пагинация внутри фильтра: два @Query() на одном методе не проходят forbidNonWhitelisted */
+export class ServiceResponseFilterDto extends PaginationDto {
   @ApiPropertyOptional({
     description: 'Фильтр по ID студента',
     example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',

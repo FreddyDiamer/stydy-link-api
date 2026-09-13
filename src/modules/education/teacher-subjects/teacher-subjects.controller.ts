@@ -5,7 +5,7 @@ import {
   TeacherSubjectResponseDto,
   TeacherSubjectFilterDto,
 } from './dto/teacher-subject.dto';
-import { PaginationDto, ApiSuccessResponse } from '@common';
+import { ApiSuccessResponse } from '@common';
 
 /**
  * Справочник связей преподаватель-предмет только для чтения: данные наполняет
@@ -26,11 +26,8 @@ export class TeacherSubjectsController {
       'Получить список связей преподавателей с предметами с фильтрацией',
   })
   @ApiSuccessResponse(TeacherSubjectResponseDto)
-  async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: TeacherSubjectFilterDto,
-  ) {
-    return this.teacherSubjectsService.findAll(paginationDto, filterDto);
+  async findAll(@Query() query: TeacherSubjectFilterDto) {
+    return this.teacherSubjectsService.findAll(query, query);
   }
 
   @Get('teacher/:teacherId')

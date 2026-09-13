@@ -20,7 +20,7 @@ Tutor posts Service ──► Student sends ServiceResponse ─► Tutor accepts
 Student posts Request ─► Tutor sends RequestResponse ──► Student accepts ► Deal ─► Review
 ```
 
-1. A tutor publishes a `Service` (subject + teacher + price, plus `lessonsCount` and `lessonDurationMinutes`). A student publishes a `Request` (subject + teacher, optional `budget` and `deadline`).
+1. A tutor publishes a `Service` (subject + teacher + price; `lessonsCount` and `lessonDurationMinutes` are optional and default to 1 and 60 — the mini-app does not send them). A student publishes a `Request` (subject + teacher, optional `budget` and `deadline`).
 2. The counterparty responds with an optional `message`, proposed `price`, and `proposedDeadline`. `ServiceResponse` additionally carries `proposedDeadlineType` (today/week/month/custom) and `budgetType` (service-price/flexible/lower/higher) — UI hints, not business logic.
 3. The owner **accepts** the response → the response becomes `ACCEPTED` and a `Deal` is created with the agreed price/deadline (response price, falling back to the request budget / service price). The deal links back one-to-one via `serviceResponseId` XOR `requestResponseId`. Accepting a `RequestResponse` also moves the request to `MATCHED` and rejects the other pending responses; accepting a `ServiceResponse` leaves the other bookings pending — a service can have many deals.
 4. The deal moves `PENDING → ACCEPTED → IN_PROGRESS → COMPLETED` (or `CANCELLED`) via `PATCH /marketplace/deals/:id/accept|reject|complete|cancel`; every transition checks the caller is a deal participant (`ensureDealParticipant`).

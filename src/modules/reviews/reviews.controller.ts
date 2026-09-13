@@ -18,12 +18,7 @@ import {
   ReviewResponseDto,
   ReviewFilterDto,
 } from './dto/review.dto';
-import {
-  PaginationDto,
-  ApiSuccessResponse,
-  CurrentUser,
-  ForbiddenException,
-} from '@common';
+import { ApiSuccessResponse, CurrentUser, ForbiddenException } from '@common';
 import { User } from '@prisma/client';
 
 @ApiTags('Reviews')
@@ -51,11 +46,8 @@ export class ReviewsController {
     description: 'Получить список отзывов с фильтрацией и пагинацией',
   })
   @ApiSuccessResponse(ReviewResponseDto)
-  async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query() filterDto: ReviewFilterDto,
-  ) {
-    return this.reviewsService.findAll(paginationDto, filterDto);
+  async findAll(@Query() query: ReviewFilterDto) {
+    return this.reviewsService.findAll(query, query);
   }
 
   @Get('my')
