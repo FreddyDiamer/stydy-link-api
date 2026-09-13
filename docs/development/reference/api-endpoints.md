@@ -102,39 +102,41 @@ Write endpoints (POST/PATCH/DELETE) were removed from all education controllers:
 | GET    | `/marketplace/services/:id/stats`                                | Service stats (responses, deals)      |
 | PATCH  | `/marketplace/services/:id`                                      | Update (owner only)                   |
 | PATCH  | `/marketplace/services/:id/activate` · `/deactivate`             | Toggle (owner only)                   |
-| PATCH  | `/marketplace/services/:id/suspend`                              | Suspend                               |
+| PATCH  | `/marketplace/services/:id/suspend`                              | Suspend (owner only)                  |
 | DELETE | `/marketplace/services/:id`                                      | Delete (owner only)                   |
 
 ## Marketplace — `/marketplace/requests`
 
-| Method | Path                                                             | Description                         |
-| ------ | ---------------------------------------------------------------- | ----------------------------------- |
-| POST   | `/marketplace/requests`                                          | Create request (must be for self)   |
-| GET    | `/marketplace/requests`                                          | List (filter)                       |
-| GET    | `/marketplace/requests/open`                                     | Open requests for tutors            |
-| GET    | `/marketplace/requests/popular`                                  | Most-responded requests (`?limit`)  |
-| GET    | `/marketplace/requests/my`                                       | Current student's requests          |
-| GET    | `/marketplace/requests/by-student/:studentId`                    | Requests of a student               |
-| GET    | `/marketplace/requests/by-subject-teacher/:subjectId/:teacherId` | Requests for a subject+teacher pair |
-| GET    | `/marketplace/requests/:id`                                      | Request by ID (with responses)      |
-| PATCH  | `/marketplace/requests/:id`                                      | Update (owner only)                 |
-| DELETE | `/marketplace/requests/:id`                                      | Delete (owner only)                 |
+| Method | Path                                                             | Description                                        |
+| ------ | ---------------------------------------------------------------- | -------------------------------------------------- |
+| POST   | `/marketplace/requests`                                          | Create request (must be for self)                  |
+| GET    | `/marketplace/requests`                                          | List (filter)                                      |
+| GET    | `/marketplace/requests/open`                                     | Open requests for tutors                           |
+| GET    | `/marketplace/requests/popular`                                  | Most-responded requests (`?limit`)                 |
+| GET    | `/marketplace/requests/my`                                       | Current student's requests                         |
+| GET    | `/marketplace/requests/by-student/:studentId`                    | Requests of a student                              |
+| GET    | `/marketplace/requests/by-subject-teacher/:subjectId/:teacherId` | Requests for a subject+teacher pair                |
+| GET    | `/marketplace/requests/:id`                                      | Request by ID (with responses)                     |
+| PATCH  | `/marketplace/requests/:id`                                      | Update (owner only)                                |
+| PATCH  | `/marketplace/requests/:id/close`                                | Close (owner only); pending responses → `REJECTED` |
+| POST   | `/marketplace/requests/:id/reopen`                               | Reopen as a **new** request (owner only)           |
+| DELETE | `/marketplace/requests/:id`                                      | Delete (owner only)                                |
 
 ## Marketplace — `/marketplace/service-responses` (student → service)
 
-| Method | Path                                                           | Description                        |
-| ------ | -------------------------------------------------------------- | ---------------------------------- |
-| POST   | `/marketplace/service-responses`                               | Create response (must be for self) |
-| GET    | `/marketplace/service-responses`                               | List (pagination + filter)         |
-| GET    | `/marketplace/service-responses/my`                            | Current student's responses        |
-| GET    | `/marketplace/service-responses/by-service/:serviceId`         | All responses to a service         |
-| GET    | `/marketplace/service-responses/by-service/:serviceId/pending` | Pending responses to a service     |
-| GET    | `/marketplace/service-responses/:id`                           | Response by ID                     |
-| GET    | `/marketplace/service-responses/:id/stats`                     | Response stats                     |
-| PATCH  | `/marketplace/service-responses/:id`                           | Update (author only)               |
-| PATCH  | `/marketplace/service-responses/:id/accept`                    | Tutor accepts → **creates a Deal** |
-| PATCH  | `/marketplace/service-responses/:id/reject`                    | Tutor rejects                      |
-| DELETE | `/marketplace/service-responses/:id`                           | Delete (author only, if no deal)   |
+| Method | Path                                                           | Description                                                                                         |
+| ------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| POST   | `/marketplace/service-responses`                               | Create response (must be for self)                                                                  |
+| GET    | `/marketplace/service-responses`                               | List (pagination + filter)                                                                          |
+| GET    | `/marketplace/service-responses/my`                            | Current student's responses                                                                         |
+| GET    | `/marketplace/service-responses/by-service/:serviceId`         | All responses to a service                                                                          |
+| GET    | `/marketplace/service-responses/by-service/:serviceId/pending` | Pending responses to a service                                                                      |
+| GET    | `/marketplace/service-responses/:id`                           | Response by ID                                                                                      |
+| GET    | `/marketplace/service-responses/:id/stats`                     | Response stats                                                                                      |
+| PATCH  | `/marketplace/service-responses/:id`                           | Update (author only)                                                                                |
+| PATCH  | `/marketplace/service-responses/:id/accept`                    | Tutor accepts → **creates a Deal** (price: response's, else service's); other bookings stay pending |
+| PATCH  | `/marketplace/service-responses/:id/reject`                    | Tutor rejects                                                                                       |
+| DELETE | `/marketplace/service-responses/:id`                           | Delete (author only, if no deal)                                                                    |
 
 ## Marketplace — `/marketplace/request-responses` (tutor → request)
 
@@ -162,7 +164,8 @@ Generic `PATCH`/`DELETE /deals/:id` were removed (they let anyone rewrite any de
 | GET    | `/marketplace/deals/:id`          | Deal by ID (participants only)                                                                 |
 | PATCH  | `/marketplace/deals/:id/accept`   | Participant accepts (→ `ACCEPTED`)                                                             |
 | PATCH  | `/marketplace/deals/:id/reject`   | Participant rejects                                                                            |
-| PATCH  | `/marketplace/deals/:id/complete` | Confirm completion from your side (deal closes when both confirm, or after 3-day auto-confirm) |
+| PATCH  | `/marketplace/deals/:id/complete` | Confirm completion from your side (deal closes when both confirm, or after 7-day auto-confirm) |
+| PATCH  | `/marketplace/deals/:id/reopen`   | "Work not ready": clears the other side's confirmation and stops the auto-confirm timer        |
 | PATCH  | `/marketplace/deals/:id/cancel`   | Cancel; optional body `{ reason }` visible to both sides                                       |
 
 ## Reviews — `/reviews`

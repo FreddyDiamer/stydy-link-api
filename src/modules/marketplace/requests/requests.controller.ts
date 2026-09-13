@@ -17,7 +17,7 @@ import {
   RequestResponseDto,
   RequestFilterDto,
 } from './dto/request.dto';
-import { ApiSuccessResponse, CurrentUser } from '@common';
+import { ApiSuccessResponse, CurrentUser, ForbiddenException } from '@common';
 import { User } from '@prisma/client';
 
 @ApiTags('Marketplace - Requests')
@@ -38,7 +38,9 @@ export class RequestsController {
   ) {
     // Проверяем, что пользователь создает заявку для себя
     if (createRequestDto.studentId !== user.id) {
-      throw new Error('Нельзя создавать заявки от имени других пользователей');
+      throw new ForbiddenException(
+        'Нельзя создавать заявки от имени других пользователей',
+      );
     }
     return this.requestsService.create(createRequestDto);
   }
@@ -176,7 +178,7 @@ export class RequestsController {
     // Проверяем принадлежность заявки пользователю
     const request = await this.requestsService.findOne(id);
     if (request.studentId !== user.id) {
-      throw new Error('Можно редактировать только свои заявки');
+      throw new ForbiddenException('Можно редактировать только свои заявки');
     }
     return this.requestsService.update(id, updateRequestDto);
   }
@@ -193,7 +195,7 @@ export class RequestsController {
   ) {
     const request = await this.requestsService.findOne(id);
     if (request.studentId !== user.id) {
-      throw new Error('Можно удалять только свои заявки');
+      throw new ForbiddenException('Можно удалять только свои заявки');
     }
     await this.requestsService.remove(id);
     return {

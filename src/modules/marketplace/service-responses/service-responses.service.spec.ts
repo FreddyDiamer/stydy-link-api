@@ -19,6 +19,9 @@ const asUser = (id: string) => ({ id }) as User;
 const service = (overrides: Record<string, unknown> = {}) => ({
   id: 'service-1',
   tutorId: TUTOR,
+  subjectId: 'subject-1',
+  teacherId: 'teacher-1',
+  price: 150000,
   status: 'ACTIVE',
   tutor: { id: TUTOR, name: 'Репетитор' },
   subject: { name: 'Математика' },
@@ -64,6 +67,8 @@ describe('ServiceResponsesService', () => {
     db.serviceResponse.create.mockResolvedValue(response());
     db.serviceResponse.findUnique.mockResolvedValue(response());
     db.serviceResponse.update.mockResolvedValue(response());
+    db.deal.findFirst.mockResolvedValue(null);
+    db.deal.create.mockResolvedValue({ id: 'deal-1', price: 200000 });
   });
 
   describe('создание отклика', () => {
@@ -163,7 +168,7 @@ describe('ServiceResponsesService', () => {
   });
 
   describe('решение по отклику', () => {
-    it('принимает отклик владелец услуги', async () => {
+    it('принимает отклик владелец услуги и создаёт сделку', async () => {
       await sut.accept('sr-1', asUser(TUTOR));
 
       expect(db.serviceResponse.update).toHaveBeenCalledWith(
@@ -171,9 +176,46 @@ describe('ServiceResponsesService', () => {
           data: expect.objectContaining({ status: 'ACCEPTED' }),
         }),
       );
+      // принятие и есть сделка: цена из отклика, связь через serviceResponseId
+      expect(db.deal.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            studentId: STUDENT,
+            tutorId: TUTOR,
+            subjectId: 'subject-1',
+            teacherId: 'teacher-1',
+            price: 200000,
+            status: 'PENDING',
+            serviceResponseId: 'sr-1',
+          }),
+        }),
+      );
       expect(notifications.notifyServiceResponseAccepted).toHaveBeenCalledWith(
         expect.objectContaining({ recipientUserId: STUDENT }),
       );
+    });
+
+    it('без цены в отклике сделка берёт цену услуги', async () => {
+      db.serviceResponse.findUnique.mockResolvedValue(
+        response({ price: null }),
+      );
+
+      await sut.accept('sr-1', asUser(TUTOR));
+
+      expect(db.deal.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ price: 150000 }),
+        }),
+      );
+    });
+
+    it('не создаёт вторую сделку по тому же отклику', async () => {
+      db.deal.findFirst.mockResolvedValue({ id: 'deal-1' });
+
+      await expectBusinessError(() => sut.accept('sr-1', asUser(TUTOR)), {
+        status: 400,
+      });
+      expect(db.deal.create).not.toHaveBeenCalled();
     });
 
     it('посторонний не может принять отклик', async () => {

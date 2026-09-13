@@ -13,7 +13,7 @@ Telegram notifications sent to users when marketplace events happen. Service-onl
 
 ## Events
 
-`NotificationService` covers: response created / accepted / rejected (both `ServiceResponse` and `RequestResponse` variants), deal created / accepted / rejected-or-cancelled / completed, review created, review reply.
+`NotificationService` covers: response created / accepted / rejected (both `ServiceResponse` and `RequestResponse` variants), deal created / accepted / rejected-or-cancelled / completed (including auto-confirm, sent to both sides), review created, review reply. Deep-link buttons use `FRONTEND_PATHS` (`src/common/constants/frontend-paths.ts`), which must match the mini-app's real routes (`/market`, `/deals`, `/profile`, `/market/services/:id`).
 
 ## How a notification goes out
 

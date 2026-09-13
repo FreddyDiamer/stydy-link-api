@@ -10,17 +10,17 @@ NestJS + Prisma (PostgreSQL) backend for **Study Link** — a tutor-marketplace 
 
 ## Tech stack
 
-| Layer      | Tech                                                                      |
-| ---------- | ------------------------------------------------------------------------- |
-| Runtime    | Node.js, TypeScript                                                       |
-| Framework  | NestJS 11 (Express platform)                                              |
-| ORM / DB   | Prisma 6 + PostgreSQL                                                     |
-| Validation | class-validator + class-transformer (DTOs), zod (config)                  |
-| Auth       | JWT (Bearer) via Telegram WebApp `initData`; dev web-login for local work |
-| Bot        | Telegraf (notifications)                                                  |
-| API docs   | Swagger at `/api/docs` (non-production)                                   |
-| Tooling    | pnpm, ESLint 9 + Prettier, Husky + lint-staged, Jest (no tests yet)       |
-| Deploy     | docker-compose: postgres + app + caddy; migrations auto-apply on start    |
+| Layer      | Tech                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------- |
+| Runtime    | Node.js, TypeScript                                                                    |
+| Framework  | NestJS 11 (Express platform)                                                           |
+| ORM / DB   | Prisma 6 + PostgreSQL                                                                  |
+| Validation | class-validator + class-transformer (DTOs), zod (config)                               |
+| Auth       | JWT (Bearer) via Telegram WebApp `initData`; dev web-login for local work              |
+| Bot        | Telegraf (notifications)                                                               |
+| API docs   | Swagger at `/api/docs` (non-production)                                                |
+| Tooling    | pnpm, ESLint 9 + Prettier, Husky + lint-staged, Jest (unit + e2e, see `docs/testing/`) |
+| Deploy     | docker-compose: postgres + app + caddy; migrations auto-apply on start                 |
 
 ## Architecture (detail in `docs/development/`)
 

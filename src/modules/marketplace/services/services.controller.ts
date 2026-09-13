@@ -17,7 +17,7 @@ import {
   ServiceResponseDto,
   ServiceQueryDto,
 } from './dto/service.dto';
-import { ApiSuccessResponse, CurrentUser } from '@common';
+import { ApiSuccessResponse, CurrentUser, ForbiddenException } from '@common';
 import { User } from '@prisma/client';
 
 @ApiTags('Marketplace - Services')
@@ -163,7 +163,7 @@ export class ServicesController {
     // Проверяем принадлежность услуги пользователю
     const service = await this.servicesService.findOne(id);
     if (service.tutorId !== user.id) {
-      throw new Error('Можно редактировать только свои услуги');
+      throw new ForbiddenException('Можно редактировать только свои услуги');
     }
     return this.servicesService.update(id, updateServiceDto);
   }
@@ -180,7 +180,7 @@ export class ServicesController {
   ) {
     const service = await this.servicesService.findOne(id);
     if (service.tutorId !== user.id) {
-      throw new Error('Можно управлять только своими услугами');
+      throw new ForbiddenException('Можно управлять только своими услугами');
     }
     return this.servicesService.activate(id);
   }
@@ -197,7 +197,7 @@ export class ServicesController {
   ) {
     const service = await this.servicesService.findOne(id);
     if (service.tutorId !== user.id) {
-      throw new Error('Можно управлять только своими услугами');
+      throw new ForbiddenException('Можно управлять только своими услугами');
     }
     return this.servicesService.deactivate(id);
   }
@@ -205,10 +205,17 @@ export class ServicesController {
   @Patch(':id/suspend')
   @ApiOperation({
     summary: 'Приостановить услугу',
-    description: 'Временно приостановить услугу (администратор)',
+    description: 'Временно приостановить услугу (только владелец)',
   })
   @ApiSuccessResponse(ServiceResponseDto)
-  async suspend(@Param('id', ParseUUIDPipe) id: string) {
+  async suspend(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ) {
+    const service = await this.servicesService.findOne(id);
+    if (service.tutorId !== user.id) {
+      throw new ForbiddenException('Можно управлять только своими услугами');
+    }
     return this.servicesService.suspend(id);
   }
 
@@ -224,7 +231,7 @@ export class ServicesController {
   ) {
     const service = await this.servicesService.findOne(id);
     if (service.tutorId !== user.id) {
-      throw new Error('Можно удалять только свои услуги');
+      throw new ForbiddenException('Можно удалять только свои услуги');
     }
     await this.servicesService.remove(id);
     return {

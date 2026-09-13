@@ -18,7 +18,12 @@ import {
   ReviewResponseDto,
   ReviewFilterDto,
 } from './dto/review.dto';
-import { PaginationDto, ApiSuccessResponse, CurrentUser } from '@common';
+import {
+  PaginationDto,
+  ApiSuccessResponse,
+  CurrentUser,
+  ForbiddenException,
+} from '@common';
 import { User } from '@prisma/client';
 
 @ApiTags('Reviews')
@@ -177,7 +182,7 @@ export class ReviewsController {
     // Проверяем принадлежность отзыва пользователю
     const review = await this.reviewsService.findOne(id);
     if (review.authorId !== user.id) {
-      throw new Error('Можно редактировать только свои отзывы');
+      throw new ForbiddenException('Можно редактировать только свои отзывы');
     }
     return this.reviewsService.update(id, updateReviewDto);
   }
@@ -209,7 +214,7 @@ export class ReviewsController {
   ) {
     const review = await this.reviewsService.findOne(id);
     if (review.authorId !== user.id) {
-      throw new Error('Можно удалять только свои отзывы');
+      throw new ForbiddenException('Можно удалять только свои отзывы');
     }
     await this.reviewsService.remove(id);
     return {

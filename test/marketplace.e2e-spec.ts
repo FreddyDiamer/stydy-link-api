@@ -152,6 +152,119 @@ describe('Маркетплейс (e2e)', () => {
     );
   });
 
+  const createService = async () => {
+    const response = await request(server)
+      .post('/api/marketplace/services')
+      .set('Authorization', `Bearer ${tutorToken}`)
+      .send({
+        subjectId,
+        teacherId,
+        price: 150000,
+        lessonsCount: 1,
+        lessonDurationMinutes: 60,
+        description: 'Интегралы и ряды',
+      })
+      .expect(201);
+    return body<{ id: string }>(response);
+  };
+
+  it('проводит петлю от записи на услугу до сделки и отзывов', async () => {
+    const service = await createService();
+
+    // запись в одно касание: без своей цены
+    const bookingResponse = await request(server)
+      .post('/api/marketplace/service-responses')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ studentId, serviceId: service.id })
+      .expect(201);
+    const booking = body<{ id: string }>(bookingResponse);
+
+    // принять запись может только владелец услуги — и это 403, а не 500
+    await request(server)
+      .patch(`/api/marketplace/service-responses/${booking.id}/accept`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(403);
+
+    await request(server)
+      .patch(`/api/marketplace/service-responses/${booking.id}/accept`)
+      .set('Authorization', `Bearer ${tutorToken}`)
+      .expect(200);
+
+    // принятие и есть сделка; цена — из услуги, раз студент свою не предлагал
+    const deal = await ctx.db.deal.findFirst({
+      where: { serviceResponseId: booking.id },
+    });
+    expect(deal).not.toBeNull();
+    expect(deal?.price).toBe(150000);
+    expect(deal?.studentId).toBe(studentId);
+    expect(deal?.tutorId).toBe(tutorId);
+
+    // повторное принятие не плодит сделок
+    await request(server)
+      .patch(`/api/marketplace/service-responses/${booking.id}/accept`)
+      .set('Authorization', `Bearer ${tutorToken}`)
+      .expect(400);
+    expect(
+      await ctx.db.deal.count({ where: { serviceResponseId: booking.id } }),
+    ).toBe(1);
+
+    // обе стороны видят сделку в своём списке
+    for (const token of [studentToken, tutorToken]) {
+      const list = await request(server)
+        .get('/api/marketplace/deals')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const { items } = body<{ items: { id: string }[] }>(list);
+      expect(items.map((d) => d.id)).toEqual([deal!.id]);
+    }
+
+    // двустороннее подтверждение и по отзыву с каждой стороны
+    await request(server)
+      .patch(`/api/marketplace/deals/${deal!.id}/complete`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    await request(server)
+      .patch(`/api/marketplace/deals/${deal!.id}/complete`)
+      .set('Authorization', `Bearer ${tutorToken}`)
+      .expect(200);
+
+    const completed = await ctx.db.deal.findUnique({ where: { id: deal!.id } });
+    expect(completed?.status).toBe('COMPLETED');
+
+    await request(server)
+      .post('/api/reviews')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ dealId: deal!.id, rating: 5 })
+      .expect(201);
+    await request(server)
+      .post('/api/reviews')
+      .set('Authorization', `Bearer ${tutorToken}`)
+      .send({ dealId: deal!.id, rating: 4 })
+      .expect(201);
+    expect(await ctx.db.review.count({ where: { dealId: deal!.id } })).toBe(2);
+  });
+
+  it('чужую услугу нельзя приостановить или изменить — 403, а не 500', async () => {
+    const service = await createService();
+
+    await request(server)
+      .patch(`/api/marketplace/services/${service.id}/suspend`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(403);
+
+    await request(server)
+      .patch(`/api/marketplace/services/${service.id}`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ description: 'взлом' })
+      .expect(403);
+
+    const untouched = await ctx.db.service.findUnique({
+      where: { id: service.id },
+    });
+    expect(untouched?.status).toBe('ACTIVE');
+    expect(untouched?.description).toBe('Интегралы и ряды');
+  });
+
   it('второй отзыв от того же автора отбивается ограничением схемы', async () => {
     const created = await createRequest();
     const response = await respond(created.id);

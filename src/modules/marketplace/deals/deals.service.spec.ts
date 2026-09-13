@@ -288,10 +288,43 @@ describe('DealsService', () => {
 
       await service.findAll({ page: 1, limit: 10, skip: 0 }, {}, STUDENT);
 
-      const { where } = firstCallArg<AutoConfirmArg>(db.deal.updateMany);
+      // просроченные сделки сначала выбираются: их участников надо уведомить
+      const { where } = firstCallArg<AutoConfirmArg>(db.deal.findMany);
       const [silence] = where.AND;
       expect(silence.OR).toHaveLength(2);
       expect(silence.OR[0].tutorConfirmedAt).toBeNull();
+      // нечего закрывать — нечего и обновлять
+      expect(db.deal.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('закрывает просроченные сделки и уведомляет обе стороны', async () => {
+      db.deal.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'deal-1',
+            studentId: STUDENT,
+            tutorId: TUTOR,
+            subject: { name: 'Математика' },
+          },
+        ])
+        .mockResolvedValueOnce([]);
+      db.deal.count.mockResolvedValue(0);
+
+      await service.autoConfirmSweep();
+
+      expect(db.deal.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ['deal-1'] } },
+          data: expect.objectContaining({ status: 'COMPLETED' }),
+        }),
+      );
+      expect(notifications.notifyDealCompleted).toHaveBeenCalledTimes(2);
+      expect(notifications.notifyDealCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: STUDENT, dealId: 'deal-1' }),
+      );
+      expect(notifications.notifyDealCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: TUTOR, dealId: 'deal-1' }),
+      );
     });
 
     it('не закрывает раньше собственного дедлайна сделки', async () => {
@@ -300,7 +333,7 @@ describe('DealsService', () => {
 
       await service.findAll({ page: 1, limit: 10, skip: 0 }, {}, STUDENT);
 
-      const { where } = firstCallArg<AutoConfirmArg>(db.deal.updateMany);
+      const { where } = firstCallArg<AutoConfirmArg>(db.deal.findMany);
       const [, deadlineGuard] = where.AND;
       // длинную работу нельзя закрыть до её собственного срока
       expect(deadlineGuard.OR).toEqual([

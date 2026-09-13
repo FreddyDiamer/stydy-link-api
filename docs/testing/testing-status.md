@@ -6,16 +6,16 @@ What the suite covers today, and the conventions it follows.
 
 `pnpm test` — every suite mocks the Prisma layer, so it runs anywhere.
 
-| Suite                                           | What it pins down                                                                                                                                     |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth/auth.service.spec.ts`                     | `initData` signature, 24h `auth_date` window, fail-closed without a bot token, dev-login only in `development`                                        |
-| `marketplace/deals/deals.service.spec.ts`       | Participant-only access, response-pair matching, two-sided confirmation, auto-confirm (never before the deal's deadline), reopen, cancellation record |
-| `marketplace/requests/requests.service.spec.ts` | Creation validation, feed shows only OPEN by default, close rejects pending responses, reopen is a new publication, ownership on edit                 |
-| `marketplace/request-responses/…spec.ts`        | Ownership and duplicate guards, accepting matches the request, closes the others and creates the deal at the right price                              |
-| `marketplace/service-responses/…spec.ts`        | Own-service and duplicate guards, accept/reject restricted to the service owner, status is not client-writable                                        |
-| `marketplace/services/services.service.spec.ts` | ACTIVE-only showcase, price filters, own/responded flags, tutor reputation from reviews, delete blocked by responses or deals                         |
-| `reviews/reviews.service.spec.ts`               | Completed-deal-only, target and role derived server-side, one review per author per deal, reply permissions, reputation split by role                 |
-| `users/users.service.spec.ts`                   | Public projections hide `telegramId`/`balance`/notification settings; balance only in your own stats                                                  |
+| Suite                                           | What it pins down                                                                                                                                                                |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth/auth.service.spec.ts`                     | `initData` signature, 24h `auth_date` window, fail-closed without a bot token, dev-login only in `development`                                                                   |
+| `marketplace/deals/deals.service.spec.ts`       | Participant-only access, response-pair matching, two-sided confirmation, auto-confirm sweep (never before the deal's deadline, notifies both sides), reopen, cancellation record |
+| `marketplace/requests/requests.service.spec.ts` | Creation validation, feed shows only OPEN by default, close rejects pending responses, reopen is a new publication, ownership on edit                                            |
+| `marketplace/request-responses/…spec.ts`        | Ownership and duplicate guards, accepting matches the request, closes the others and creates the deal at the right price                                                         |
+| `marketplace/service-responses/…spec.ts`        | Own-service and duplicate guards, accept/reject restricted to the service owner, accept creates the deal (response price, else service price), status is not client-writable     |
+| `marketplace/services/services.service.spec.ts` | ACTIVE-only showcase, price filters, own/responded flags, tutor reputation from reviews, delete blocked by responses or deals                                                    |
+| `reviews/reviews.service.spec.ts`               | Completed-deal-only, target and role derived server-side, one review per author per deal, reply permissions, reputation split by role                                            |
+| `users/users.service.spec.ts`                   | Public projections hide `telegramId`/`balance`/notification settings; balance only in your own stats                                                                             |
 
 Shared mocks live in **`src/test-support/mocks.ts`** — that directory is excluded from the production build (`tsconfig.build.json`), which is why the helpers do not sit under `src/common`:
 
@@ -30,7 +30,7 @@ Jest maps the `@common` / `@config` / `@database` / `@modules` aliases via `modu
 
 `pnpm run test:e2e` boots the whole app through `AppModule` with the same pipeline as `main.ts` (global `/api` prefix, `ValidationPipe` with whitelist + forbidNonWhitelisted, `GlobalExceptionFilter`) and drives it over HTTP with supertest against a real database.
 
-- `test/marketplace.e2e-spec.ts` — the loop end to end: request → response → accept → deal → both sides confirm → one review from each. Also that a closed request drops out of the feed but stays with its author, and that a second review from the same author is refused by the schema's composite unique key.
+- `test/marketplace.e2e-spec.ts` — both loops end to end: request → response → accept → deal → both sides confirm → one review from each; and service → booking (no price) → tutor accepts → deal at the service price → both confirm → reviews, with the deal visible to both sides in `GET /marketplace/deals`. Also that a closed request drops out of the feed but stays with its author, that a second review from the same author is refused by the schema's composite unique key, and that ownership checks (accept a booking, suspend or edit a service) answer 403, not 500.
 - `test/pipeline.e2e-spec.ts` — the parts unit tests cannot see: the global guard (401 without a token, 401 for a token whose user was deleted), the success envelope the frontend's `apiClient` unwraps, `forbidNonWhitelisted` rejecting extra fields (this is what keeps the frontend from sending `authorId` to `/reviews` again), `ParseUUIDPipe`, and error mapping to 403/404 with a body.
 
 **Setup.** E2E needs its own database — the suite truncates every table before each test, so never point it at a working database.

@@ -27,7 +27,7 @@ export class ServiceResponsesService extends BaseService {
 
   async create(
     createServiceResponseDto: CreateServiceResponseDto,
-  ): Promise<any> {
+  ): Promise<ServiceResponse> {
     try {
       // Проверяем существование студента и услуги
       const [student, service] = await Promise.all([
@@ -517,6 +517,14 @@ export class ServiceResponsesService extends BaseService {
     }
   }
 
+  /**
+   * Репетитор принимает запись на услугу.
+   *
+   * Принятие — это и есть сделка: без неё петля обрывалась на «принято»,
+   * а витрина «Услуги» не давала ни подтверждения, ни отзыва. Цена берётся
+   * из отклика, если студент предложил свою, иначе из услуги. Остальные
+   * записи на ту же услугу не трогаем: услуга — это поток, а не одна вакансия.
+   */
   async accept(id: string, user: User): Promise<ServiceResponse> {
     const response = await this.findOne(id);
     const responseWithService = response as ServiceResponse & {
@@ -527,7 +535,13 @@ export class ServiceResponsesService extends BaseService {
     };
     const service = await this.db.service.findUnique({
       where: { id: response.serviceId },
-      select: { tutorId: true },
+      select: {
+        tutorId: true,
+        subjectId: true,
+        teacherId: true,
+        price: true,
+        status: true,
+      },
     });
     if (!service) {
       throw new NotFoundException('Service', response.serviceId);
@@ -546,16 +560,50 @@ export class ServiceResponsesService extends BaseService {
     if (response.status !== 'PENDING') {
       throw new BusinessException('Отклик уже обработан');
     }
-    const updated = await this.setStatus(id, 'ACCEPTED');
+    const existingDeal = await this.db.deal.findFirst({
+      where: { serviceResponseId: id },
+    });
+    if (existingDeal) {
+      throw new BusinessException('По этому отклику уже создана сделка');
+    }
+    const price = response.price ?? service.price;
+    if (price == null || price < 100) {
+      throw new BusinessException('Не указана цена для сделки');
+    }
+
+    await this.db.$transaction(async (tx) => {
+      await tx.serviceResponse.update({
+        where: { id },
+        data: { status: 'ACCEPTED', updatedAt: new Date() },
+      });
+      await tx.deal.create({
+        data: {
+          studentId: response.studentId,
+          tutorId,
+          subjectId: service.subjectId,
+          teacherId: service.teacherId,
+          price,
+          deadline: response.proposedDeadline ?? undefined,
+          status: 'PENDING',
+          serviceResponseId: id,
+        },
+      });
+    });
+    const deal = await this.db.deal.findFirst({
+      where: { serviceResponseId: id },
+    });
+
     void this.notificationService.notifyServiceResponseAccepted({
       recipientUserId: response.studentId,
       actorName: responseWithService.service?.tutor?.name ?? 'Репетитор',
       actorUserId: responseWithService.service?.tutor?.id ?? tutorId,
       responseId: id,
       serviceId: response.serviceId,
+      dealId: deal?.id,
       subjectName: responseWithService.service?.subject?.name,
+      price: deal?.price ?? price,
     });
-    return updated;
+    return this.findOne(id);
   }
 
   async reject(id: string, user: User): Promise<ServiceResponse> {

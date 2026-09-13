@@ -4,22 +4,22 @@
  * Use with buildFrontendUrl(baseUrl, path, params) to get full URL.
  */
 export const FRONTEND_PATHS = {
-  /** Public user profile: /user/:id */
-  USER_PROFILE: '/user/:id',
-  /** Student: orders list */
-  STUDENT_ORDERS: '/student/orders',
-  /** Student: deal details */
-  STUDENT_DEAL_DETAILS: '/student/deals/:id',
-  /** Student: reviews */
-  STUDENT_REVIEWS: '/student/reviews',
-  /** Tutor: orders list */
-  TUTOR_ORDERS: '/tutor/orders',
-  /** Tutor: deal details */
-  TUTOR_DEAL_DETAILS: '/tutor/deals/:id',
-  /** Tutor: service responses for a service */
-  TUTOR_SERVICE_RESPONSES: '/tutor/services/:id/responses',
-  /** Tutor: reviews */
-  TUTOR_REVIEWS: '/tutor/reviews',
+  /** There is no public profile screen yet — the feed is the closest entry */
+  USER_PROFILE: '/market',
+  /** Deals tab (both roles share one list) */
+  STUDENT_ORDERS: '/deals',
+  /** Deal details: the deals list, there is no per-deal route yet */
+  STUDENT_DEAL_DETAILS: '/deals',
+  /** Reviews live on the profile screen */
+  STUDENT_REVIEWS: '/profile',
+  /** Deals tab (both roles share one list) */
+  TUTOR_ORDERS: '/deals',
+  /** Deal details: the deals list, there is no per-deal route yet */
+  TUTOR_DEAL_DETAILS: '/deals',
+  /** Bookings on a service are shown on the service screen to its owner */
+  TUTOR_SERVICE_RESPONSES: '/market/services/:id',
+  /** Reviews live on the profile screen */
+  TUTOR_REVIEWS: '/profile',
 } as const;
 
 /**

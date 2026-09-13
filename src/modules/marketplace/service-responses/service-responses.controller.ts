@@ -17,7 +17,12 @@ import {
   ServiceResponseResponseDto,
   ServiceResponseFilterDto,
 } from './dto/service-response.dto';
-import { PaginationDto, ApiSuccessResponse, CurrentUser } from '@common';
+import {
+  PaginationDto,
+  ApiSuccessResponse,
+  CurrentUser,
+  ForbiddenException,
+} from '@common';
 import { User } from '@prisma/client';
 
 @ApiTags('Marketplace - Service Responses')
@@ -40,7 +45,9 @@ export class ServiceResponsesController {
   ) {
     // Проверяем, что пользователь создает отклик для себя
     if (createServiceResponseDto.studentId !== user.id) {
-      throw new Error('Нельзя создавать отклики от имени других пользователей');
+      throw new ForbiddenException(
+        'Нельзя создавать отклики от имени других пользователей',
+      );
     }
     return this.serviceResponsesService.create(createServiceResponseDto);
   }
@@ -138,7 +145,7 @@ export class ServiceResponsesController {
     // Проверяем принадлежность отклика пользователю
     const response = await this.serviceResponsesService.findOne(id);
     if (response.studentId !== user.id) {
-      throw new Error('Можно редактировать только свои отклики');
+      throw new ForbiddenException('Можно редактировать только свои отклики');
     }
     return this.serviceResponsesService.update(id, updateServiceResponseDto);
   }
@@ -181,7 +188,7 @@ export class ServiceResponsesController {
   ) {
     const response = await this.serviceResponsesService.findOne(id);
     if (response.studentId !== user.id) {
-      throw new Error('Можно удалять только свои отклики');
+      throw new ForbiddenException('Можно удалять только свои отклики');
     }
     await this.serviceResponsesService.remove(id);
     return {

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../../../database/database.service';
 import { CreateDealDto, DealFilterDto } from './dto/deal.dto';
 import {
@@ -263,6 +264,7 @@ export class DealsService extends BaseService {
 
   /** Получить сделку с проверкой, что пользователь — её участник */
   async findOneForUser(id: string, userId: string) {
+    await this.applyAutoConfirmations();
     const deal = await this.findOne(id);
     if (deal.studentId !== userId && deal.tutorId !== userId) {
       throw new ForbiddenException('Вы не являетесь участником этой сделки');
@@ -492,38 +494,73 @@ export class DealsService extends BaseService {
   }
 
   /**
+   * Планировщик: авто-подтверждение не должно зависеть от того, откроет ли
+   * кто-то список сделок. Раз в час достаточно — срок считается днями.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async autoConfirmSweep(): Promise<void> {
+    await this.applyAutoConfirmations();
+  }
+
+  /**
    * Закрывает сделки, где одна сторона подтвердила выполнение, а вторая
-   * молчит дольше AUTO_CONFIRM_DAYS. Вызывается при чтении списка сделок,
-   * чтобы не тащить в проект планировщик ради одной операции.
+   * молчит дольше AUTO_CONFIRM_DAYS. Вызывается планировщиком и при чтении
+   * сделок, чтобы выдача никогда не показывала просроченный статус.
+   * Обе стороны получают уведомление о закрытии — иначе молчавшая сторона
+   * не узнает, что отзыв уже открыт.
    */
   private async applyAutoConfirmations(): Promise<void> {
     const now = new Date();
     const cutoff = new Date(now.getTime() - AUTO_CONFIRM_DAYS * DAY_MS);
-    try {
-      await this.db.deal.updateMany({
-        where: {
-          status: {
-            in: [
-              DEAL_STATUS.PENDING,
-              DEAL_STATUS.ACCEPTED,
-              DEAL_STATUS.IN_PROGRESS,
-            ],
-          },
-          AND: [
-            // одна сторона подтвердила и молчание длится дольше срока
-            {
-              OR: [
-                { studentConfirmedAt: { lt: cutoff }, tutorConfirmedAt: null },
-                { tutorConfirmedAt: { lt: cutoff }, studentConfirmedAt: null },
-              ],
-            },
-            // но не раньше собственного срока сделки: длинную работу
-            // нельзя закрыть до дедлайна
-            { OR: [{ deadline: null }, { deadline: { lt: cutoff } }] },
+    const where: Prisma.DealWhereInput = {
+      status: {
+        in: [
+          DEAL_STATUS.PENDING,
+          DEAL_STATUS.ACCEPTED,
+          DEAL_STATUS.IN_PROGRESS,
+        ],
+      },
+      AND: [
+        // одна сторона подтвердила и молчание длится дольше срока
+        {
+          OR: [
+            { studentConfirmedAt: { lt: cutoff }, tutorConfirmedAt: null },
+            { tutorConfirmedAt: { lt: cutoff }, studentConfirmedAt: null },
           ],
         },
+        // но не раньше собственного срока сделки: длинную работу
+        // нельзя закрыть до дедлайна
+        { OR: [{ deadline: null }, { deadline: { lt: cutoff } }] },
+      ],
+    };
+    try {
+      const expired = await this.db.deal.findMany({
+        where,
+        select: {
+          id: true,
+          studentId: true,
+          tutorId: true,
+          subject: { select: { name: true } },
+        },
+      });
+      if (!expired.length) return;
+
+      await this.db.deal.updateMany({
+        where: { id: { in: expired.map((d) => d.id) } },
         data: { status: DEAL_STATUS.COMPLETED, updatedAt: new Date() },
       });
+
+      for (const deal of expired) {
+        for (const recipientUserId of [deal.studentId, deal.tutorId]) {
+          void this.notificationService.notifyDealCompleted({
+            recipientUserId,
+            actorName: 'Study Link',
+            actorUserId: recipientUserId,
+            dealId: deal.id,
+            subjectName: deal.subject?.name,
+          });
+        }
+      }
     } catch (error) {
       // авто-подтверждение не должно ронять выдачу списка сделок
       this.logError(
