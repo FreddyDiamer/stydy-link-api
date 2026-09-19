@@ -34,10 +34,11 @@ Shared code lives in `src/common/` (decorators, guards, pipes, filters, intercep
 
 Every HTTP request passes through, in order:
 
-1. **`JwtAuthGuard`** (global `APP_GUARD`) — requires a Bearer JWT unless the handler or controller is marked `@Public()`. On success, `request.user` is the full Prisma `User` (loaded by `src/modules/auth/strategies/jwt.strategy.ts`); read it with `@CurrentUser()`.
-2. **`ValidationPipe`** (global, in `main.ts`) — `transform` + `whitelist` + `forbidNonWhitelisted`: unknown body fields are rejected with 400, DTOs are class instances.
-3. **Controller → Service** — controllers stay thin (routing, ownership checks, Swagger decorators); business logic and Prisma queries live in services.
-4. **`TransformInterceptor`** (global `APP_INTERCEPTOR`) — wraps every successful response:
+1. **`ThrottlerGuard`** (global `APP_GUARD`, registered before the JWT guard) — 100 requests per minute per IP (`ThrottlerModule.forRoot` in `src/app.module.ts`); `POST /auth/telegram` is tightened to 10 via `@Throttle`. `main.ts` sets `trust proxy` so the client IP comes from Caddy's `X-Forwarded-For`. Over the limit → 429.
+2. **`JwtAuthGuard`** (global `APP_GUARD`) — requires a Bearer JWT unless the handler or controller is marked `@Public()`. On success, `request.user` is the full Prisma `User` (loaded by `src/modules/auth/strategies/jwt.strategy.ts`); read it with `@CurrentUser()`.
+3. **`ValidationPipe`** (global, in `main.ts`) — `transform` + `whitelist` + `forbidNonWhitelisted`: unknown body fields are rejected with 400, DTOs are class instances.
+4. **Controller → Service** — controllers stay thin (routing, ownership checks, Swagger decorators); business logic and Prisma queries live in services.
+5. **`TransformInterceptor`** (global `APP_INTERCEPTOR`) — wraps every successful response:
 
 ```json
 {
@@ -48,7 +49,7 @@ Every HTTP request passes through, in order:
 }
 ```
 
-5. **`GlobalExceptionFilter`** — converts `BusinessException` subclasses and `HttpException`s into a standard error shape (`statusCode`, `error`, `message`, `path`, `timestamp`); unexpected errors become 500 and are logged with the request context.
+6. **`GlobalExceptionFilter`** — converts `BusinessException` subclasses and `HttpException`s into a standard error shape (`statusCode`, `error`, `message`, `path`, `timestamp`); unexpected errors become 500 and are logged with the request context.
 
 ## Configuration
 

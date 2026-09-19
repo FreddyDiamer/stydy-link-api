@@ -25,7 +25,8 @@ NestJS + Prisma (PostgreSQL) backend for **Study Link** — a tutor-marketplace 
 ## Architecture (detail in `docs/development/`)
 
 - **Feature modules** under `src/modules/` (auth, users, tutors, education, marketplace, reviews, notifications, parser); shared layer in `src/common/`, imported as `@common`
-- **Global request pipeline** — `JwtAuthGuard` (opt-out via `@Public()`), `ValidationPipe` (whitelist + forbidNonWhitelisted), `TransformInterceptor` (success envelope), `GlobalExceptionFilter`; global `/api` prefix
+- **Global request pipeline** — `ThrottlerGuard` (100 req/min per IP; `POST /auth/telegram` tightened to 10 via `@Throttle`), `JwtAuthGuard` (opt-out via `@Public()`), `ValidationPipe` (whitelist + forbidNonWhitelisted), `TransformInterceptor` (success envelope), `GlobalExceptionFilter`; global `/api` prefix
+- **Scheduled jobs** — `@nestjs/schedule`; the only cron is the hourly deal auto-confirm sweep in `DealsService`
 - **Errors** — throw `BusinessException` subclasses from `@common`, never raw `throw`
 - **Services** extend `BaseService` (logging, retry); all DB access via injected `DatabaseService` (PrismaClient)
 - **Money** — integers in kopecks everywhere
@@ -39,6 +40,9 @@ NestJS + Prisma (PostgreSQL) backend for **Study Link** — a tutor-marketplace 
 pnpm run start:dev        # dev server, watch mode (port 3000)
 pnpm run build            # compile to dist/
 pnpm run lint:check       # ESLint without autofix
+pnpm test                 # unit suites (Prisma mocked, no database needed)
+pnpm test reviews.service # one suite by filename pattern; add -t "name" for one test
+pnpm run test:e2e         # HTTP-level tests; needs a dedicated test db — setup in docs/testing/testing-status.md
 npx prisma migrate dev    # apply/create migrations (local db)
 npx prisma generate       # regenerate Prisma client
 pnpm run prisma:seed      # seed the database
