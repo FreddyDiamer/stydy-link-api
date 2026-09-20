@@ -42,7 +42,7 @@ async function bootstrap() {
   // Swagger documentation
   if (configService.get('app.nodeEnv') !== 'production') {
     const config = new DocumentBuilder()
-      .setTitle('Kai Repetitor API')
+      .setTitle('Study Link API')
       .setDescription('API для платформы поиска репетиторов')
       .setVersion('1.0')
       .addBearerAuth()
