@@ -33,6 +33,20 @@ Editing the schema without creating a migration is a hard-rule violation (`docs/
 
 If only the client is stale (e.g. after pulling someone else's migration): `npx prisma generate`.
 
+## Seed
+
+`pnpm run prisma:seed` fills a **local** database with demo data. It throws before any write when `NODE_ENV=production`; the Docker entrypoint never calls it.
+
+| Block          | Rows                                                                                                                             | Found by                                                                                    | On re-run                 |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------- |
+| Users          | 5 tutors + 3 students (`anna_math` … `student_pavel`)                                                                            | `telegramId`                                                                                | profile and balance reset |
+| Reference data | 18 subjects, 10 teachers (`teacher_001`…), their `TeacherSubject` links, 8 groups (`seed_group_4101`…)                           | `name` / `foreignId`                                                                        | untouched                 |
+| Marketplace    | 8 services, 6 requests, 15 responses, 7 deals (`PENDING`, `ACCEPTED`, one-side-confirmed, 3 `COMPLETED`, `CANCELLED`), 5 reviews | fixed ids (`5eed0001-…` services, `5eed0002-…` requests), then the schema's `@@unique` keys | untouched (`update: {}`)  |
+
+Log in as a seed user with `POST /auth/dev/login` and the `userId` the seed prints. Marketplace rows mirror what the API produces: every deal hangs off an `ACCEPTED` response, and its price and deadline follow the `accept()` fallbacks. Groups are seeded only so the profile's group picker is not empty locally (`seed_group_*` foreign ids never collide with the university's); real groups and all group links (`GroupSubject`, `GroupSubjectTeacher`) come from the parser ([domains/parser.md](domains/parser.md)).
+
+When adding demo rows, extend the `demoServices` / `demoRequests` arrays in `prisma/seed.ts` and give each new service or request its own fixed id. `IN_PROGRESS` deals are not seeded: no code path produces that status.
+
 ## Schema conventions
 
 - IDs are `String @id @default(uuid())`

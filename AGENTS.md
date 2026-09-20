@@ -45,7 +45,7 @@ pnpm test reviews.service # one suite by filename pattern; add -t "name" for one
 pnpm run test:e2e         # HTTP-level tests; needs a dedicated test db — setup in docs/testing/testing-status.md
 npx prisma migrate dev    # apply/create migrations (local db)
 npx prisma generate       # regenerate Prisma client
-pnpm run prisma:seed      # seed the database
+pnpm run prisma:seed      # demo users, reference data, marketplace (idempotent; refuses production)
 ```
 
 ## Knowledge zones
