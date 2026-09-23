@@ -26,6 +26,12 @@ services:
       dockerfile: DockerFile
       target: production
     container_name: study-link-api
+    healthcheck:
+      test: ['CMD', 'curl', '-f', '127.0.0.1:3000/api']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     ports:
       # Только localhost: наружу API отдаёт Caddy (TLS)
       - '127.0.0.1:${PORT:-3000}:${PORT:-3000}'
@@ -38,6 +44,8 @@ services:
       # а не поднимает продакшен с известным ключом
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:?FRONTEND_BASE_URL is required}
+
     volumes:
       - app_logs:/app/logs
     depends_on:
@@ -54,6 +62,7 @@ services:
       - '443:443'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+      - ../stydy-link/dist:/srv/www:ro
       - caddy_data:/data
       - caddy_config:/config
       - caddy_logs:/var/log/caddy
