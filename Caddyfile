@@ -1,17 +1,27 @@
 #  домен для продакшна
-kai-study-link.ru {
+study-link.site {
     reverse_proxy app:3000
-    
+
     # Автоматический HTTPS
-    tls your-email@example.com
-    
-    # Сжатие
-    encode gzip
+    tls mgapurov2000@gmail.com
+
+    encode zstd gzip
+
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
 
     handle /api/* {
         reverse_proxy app:3000
     }
-    
+
+    handle {
+        root * /srv/www
+        try_files {path} /index.html
+        file_server
+    }
+
     # Кэширование статических файлов
     @static {
         path *.css *.js *.png *.jpg *.jpeg *.gif *.ico *.svg

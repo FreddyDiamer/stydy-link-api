@@ -11,6 +11,8 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
+  const isProduction =
+    configService.get<string>('app.nodeEnv') === 'production';
 
   // За Caddy: реальный IP клиента берём из X-Forwarded-For (нужно для rate limiting)
   app.set('trust proxy', 1);
@@ -35,12 +37,12 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production' ? false : true,
+    origin: isProduction ? false : true,
     credentials: true,
   });
 
   // Swagger documentation
-  if (configService.get('app.nodeEnv') !== 'production') {
+  if (!isProduction) {
     const config = new DocumentBuilder()
       .setTitle('Study Link API')
       .setDescription('API для платформы поиска репетиторов')

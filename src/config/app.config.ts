@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 const appConfigSchema = z.object({
   port: z.number().int().positive().default(3000),
-  nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
+  nodeEnv: z.enum(['development', 'production', 'test']).default('production'),
   telegramBotToken: z.string().optional(),
   frontendBaseUrl: z.string().url().optional(),
 });

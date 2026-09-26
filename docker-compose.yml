@@ -1,59 +1,49 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:18-alpine
     container_name: study-link-db
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: ${POSTGRES_DB:-study_link}
-    ports:
-      # Только localhost: наружу БД не публикуем
-      - '127.0.0.1:5432:5432'
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-study_link}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-study_link}',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     restart: unless-stopped
-    networks:
-      - app-network
 
   app:
     build:
       context: .
-      dockerfile: DockerFile
       target: production
     container_name: study-link-api
-    healthcheck:
-      test: ['CMD', 'curl', '-f', '127.0.0.1:3000/api']
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    ports:
-      # Только localhost: наружу API отдаёт Caddy (TLS)
-      - '127.0.0.1:${PORT:-3000}:${PORT:-3000}'
-    environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
-      - PORT=${PORT:-3000}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-study_link}
-      # Секреты без небезопасных дефолтов: отсутствие значения валит запуск,
-      # а не поднимает продакшен с известным ключом
-      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
-      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:?FRONTEND_BASE_URL is required}
-
     volumes:
       - app_logs:/app/logs
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-study_link}?schema=public
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:?FRONTEND_BASE_URL is required}
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', '127.0.0.1:3000/api']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
-    networks:
-      - app-network
+
   caddy:
     image: caddy:latest
     container_name: study-link-caddy
@@ -66,8 +56,6 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - caddy_logs:/var/log/caddy
-    networks:
-      - app-network
     depends_on:
       - app
     restart: unless-stopped
@@ -78,7 +66,3 @@ volumes:
   caddy_data:
   caddy_config:
   caddy_logs:
-
-networks:
-  app-network:
-    driver: bridge
