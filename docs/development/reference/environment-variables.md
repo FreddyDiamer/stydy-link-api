@@ -14,12 +14,6 @@ Every variable the app reads, and how the zod-validated configs (`src/config/`) 
 | `PORT`               | HTTP port                                              | Default `3000`                                                                                                                                                   |
 | `NODE_ENV`           | `development` / `production` / `test`                  | Default `development`; gates Swagger, CORS, dev auth, mock `initData`                                                                                            |
 
-## Docker-only variables (`docker-compose.yml`)
-
-| Variable                                              | Purpose                                                                               |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Provision the `postgres` container; compose builds the app's `DATABASE_URL` from them |
-
 Compose has no insecure fallbacks: `POSTGRES_PASSWORD`, `JWT_SECRET`, and `TELEGRAM_BOT_TOKEN` must be set or `docker compose up` fails. Postgres (5432) and the app port bind to `127.0.0.1` only — external traffic goes through Caddy.
 
 ## Adding a variable
