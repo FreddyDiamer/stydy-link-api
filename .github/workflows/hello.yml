@@ -9,16 +9,6 @@ jobs: # ЧТО делать
   hello: # имя job
     runs-on: ubuntu-latest # НА ЧЁМ
     steps:
-      - uses: actions/checkout@v4 # готовое действие
       - run: uname -m && ls -la # своя shell-команда
       - run: echo "Коммит ${{ github.sha }}"
       - run: echo "Ветка ${{ github.ref }}"
-      - run: echo "Ссылка на коммит ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: uname -m && ls -la
-      - run: echo "Коммит ${{ github.sha }}"
-      - run: echo "Ветка ${{ github.ref }}"
-      - run: echo "Ссылка на коммит ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
