@@ -1,16 +1,23 @@
 name: Deploy
 
 on:
+  push:
+    branches: ['main']
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      IMAGE_TAG: ghcr.io/${{ github.repository }}:$(date +%s)
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
+      - name: Setup ENV
+        run: echo "IMAGE_TAG=ghcr.io/freddydiamer/study-link-api:$(date +%s)" >> "$GITHUB_ENV"
+      - name: Login GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u freddydiamer --password-stdin
       - name: Build the Docker image
-        run: docker build . --file Dockerfile --tag $IMAGE_TAG
+        run: docker build . --tag $IMAGE_TAG
       - name: Push the Docker image
         run: docker push $IMAGE_TAG
