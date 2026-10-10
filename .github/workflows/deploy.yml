@@ -1,0 +1,16 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ghcr.io/${{ github.repository }}:$(date +%s)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag $IMAGE_TAG
+      - name: Push the Docker image
+        run: docker push $IMAGE_TAG
