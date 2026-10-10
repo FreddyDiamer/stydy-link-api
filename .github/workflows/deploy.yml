@@ -14,9 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup ENV
-        run: echo "IMAGE_TAG=ghcr.io/freddydiamer/study-link-api:$(date +%s)" >> "$GITHUB_ENV"
+        run: echo "IMAGE_TAG=ghcr.io/freddydiamer/study-link-api:${{ job.workflow_sha }}" >> "$GITHUB_ENV"
       - name: Login GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u freddydiamer --password-stdin
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u github.triggering_actor --password-stdin
       - name: Build the Docker image
         run: docker build . --tag $IMAGE_TAG
       - name: Push the Docker image
