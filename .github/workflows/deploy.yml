@@ -48,13 +48,9 @@ jobs:
       - name: Init ssh credits
         run: |
           mkdir -p ~/.ssh
-          echo secrets.SSH_TOKEN
-          echo "${{ secrets.SSH_TOKEN }}"
-          echo "secrets.SSH_TOKEN end"
           echo "${{ secrets.SSH_TOKEN }}" > ~/.ssh/id_ed25519
-          echo "$SSH_HOST_TOKEN"
-          echo "${{ secrets.SSH_HOST_TOKEN }}"
-          echo "$SSH_HOST_TOKEN" > ~/.ssh/known_hosts
+          echo "${{ vars.SSH_HOST_TOKEN }}" > ~/.ssh/known_hosts
       - run: ls ~/.ssh
+      - run: cat ~/.ssh/id_ed25519
       - run: cat ~/.ssh/known_hosts
       - run: docker compose --env-file .env --env-file versions.env up
