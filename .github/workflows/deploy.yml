@@ -47,3 +47,4 @@ jobs:
         run: |
           ls /
           ls .
+          echo "${{ secrets.SSH }}"
