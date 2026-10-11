@@ -47,7 +47,4 @@ jobs:
     steps:
       - name: Init ssh credits
         run: |
-          ls /
-          pwd
-          ls .
-          echo "${{ secrets.SSH }}"
+          echo "${{ secrets.SSH }}" >> /home/runner/.ssh/
