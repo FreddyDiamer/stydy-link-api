@@ -47,4 +47,9 @@ jobs:
     steps:
       - name: Init ssh credits
         run: |
-          echo "${{ secrets.SSH }}" >> /home/runner/.ssh/
+          cd ~/.ssh
+          echo "${{ secrets.SSH }}" > id_ed25519
+          echo "$SSH_HOST_TOKEN" > known_hosts
+      - run: ls ~/.ssh
+      - run: cat ~/.ssh/known_hosts
+      - run: docker compose --env-file .env --env-file versions.env up
