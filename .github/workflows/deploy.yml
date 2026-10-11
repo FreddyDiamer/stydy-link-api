@@ -48,11 +48,12 @@ jobs:
       - name: Init ssh credits
         run: |
           mkdir -p ~/.ssh
-          echo secrets.SSH
-          echo "${{ secrets.SSH }}"
-          echo "secrets.SSH end"
-          echo "${{ secrets.SSH }}" > ~/.ssh/id_ed25519
+          echo secrets.SSH_TOKEN
+          echo "${{ secrets.SSH_TOKEN }}"
+          echo "secrets.SSH_TOKEN end"
+          echo "${{ secrets.SSH_TOKEN }}" > ~/.ssh/id_ed25519
           echo "$SSH_HOST_TOKEN"
+          echo "${{ env.SSH_HOST_TOKEN }}"
           echo "$SSH_HOST_TOKEN" > ~/.ssh/known_hosts
       - run: ls ~/.ssh
       - run: cat ~/.ssh/known_hosts
