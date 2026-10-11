@@ -13,7 +13,6 @@ on:
         '.husky/**',
         '.claude/**',
       ]
-  workflow_dispatch:
 
 jobs:
   env:
@@ -21,6 +20,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: write
