@@ -46,11 +46,18 @@ jobs:
     # needs: build
     steps:
       - name: Init ssh credits
+        env:
+          SSH_TOKEN: ${{ secrets.SSH_TOKEN }}
+          SSH_HOST_TOKEN: ${{ vars.SSH_HOST_TOKEN }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_TOKEN }}" > ~/.ssh/id_ed25519
-          echo "${{ vars.SSH_HOST_TOKEN }}" > ~/.ssh/known_hosts
-      - run: |
-          ssh ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }}
+          echo "$SSH_TOKEN" > ~/.ssh/id_ed25519
+          echo "$SSH_HOST_TOKEN" > ~/.ssh/known_hosts
+          cat ~/.ssh/known_hosts
+      - env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ vars.SSH_HOST }}
+        run: |
+          ssh $SSH_USER@$SSH_HOST
           ls
       - run: docker compose --env-file .env --env-file versions.env up
