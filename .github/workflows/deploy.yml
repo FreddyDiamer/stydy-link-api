@@ -58,5 +58,4 @@ jobs:
       - env:
           SSH_USER: ${{ vars.SSH_USER }}
           SSH_HOST: ${{ vars.SSH_HOST }}
-        run: |
-          ssh $SSH_USER@$SSH_HOST "cd /srv/study-link-deploy/ && sed -i 's/^API_IMAGE_TAG=.*/API_IMAGE_TAG=${{ env.IMAGE_TAG }}/' versions.env && docker compose --env-file .env --env-file versions.env up -d --wait"
+        run: ssh $SSH_USER@$SSH_HOST "cd /srv/study-link-deploy/ && sed -i 's/^API_IMAGE_TAG=.*/API_IMAGE_TAG=${{ env.IMAGE_TAG }}/' versions.env && docker compose --env-file .env --env-file versions.env up -d --wait"
