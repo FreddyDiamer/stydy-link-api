@@ -58,5 +58,6 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ vars.SSH_HOST }}
         run: |
+          echo "user=[$SSH_USER] host=[$SSH_HOST]"
           ssh $SSH_USER@$SSH_HOST 'whoami && docker ps'
       - run: docker compose --env-file .env --env-file versions.env up
