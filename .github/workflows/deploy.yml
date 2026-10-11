@@ -50,7 +50,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_TOKEN }}" > ~/.ssh/id_ed25519
           echo "${{ vars.SSH_HOST_TOKEN }}" > ~/.ssh/known_hosts
-      - run: ls ~/.ssh
-      - run: cat ~/.ssh/id_ed25519
-      - run: cat ~/.ssh/known_hosts
+      - run: |
+          ssh ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }}
+          ls
       - run: docker compose --env-file .env --env-file versions.env up
