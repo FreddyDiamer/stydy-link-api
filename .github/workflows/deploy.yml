@@ -42,10 +42,12 @@ jobs:
           cache-to: type=gha,mode=max
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    # environment: production
+    needs: build
     steps:
       - name: Init ssh credits
         run: |
           ls /
+          echo "ls ."
           ls .
           echo "${{ secrets.SSH }}"
