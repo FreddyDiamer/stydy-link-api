@@ -55,9 +55,8 @@ jobs:
           echo "$SSH_HOST_TOKEN" > ~/.ssh/known_hosts
           cat ~/.ssh/known_hosts
       - env:
-          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_USER: ${{ var.SSH_USER }}
           SSH_HOST: ${{ vars.SSH_HOST }}
         run: |
-          echo "user=[$SSH_USER] host=[$SSH_HOST]"
           ssh $SSH_USER@$SSH_HOST 'whoami && docker ps'
       - run: docker compose --env-file .env --env-file versions.env up
