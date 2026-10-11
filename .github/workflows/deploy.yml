@@ -47,6 +47,7 @@ jobs:
     steps:
       - name: Init ssh credits
         run: |
+          mkdir -p ~/.ssh
           cd ~/.ssh
           echo "${{ secrets.SSH }}" > id_ed25519
           echo "$SSH_HOST_TOKEN" > known_hosts
