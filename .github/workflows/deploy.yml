@@ -55,7 +55,7 @@ jobs:
           echo "$SSH_HOST_TOKEN" > ~/.ssh/known_hosts
           cat ~/.ssh/known_hosts
       - env:
-          SSH_USER: ${{ var.SSH_USER }}
+          SSH_USER: ${{ vars.SSH_USER }}
           SSH_HOST: ${{ vars.SSH_HOST }}
         run: |
           ssh $SSH_USER@$SSH_HOST 'whoami && docker ps'
