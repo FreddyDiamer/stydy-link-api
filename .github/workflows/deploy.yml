@@ -19,9 +19,8 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment: production
     permissions:
       contents: read
       packages: write
@@ -40,17 +39,23 @@ jobs:
           tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Init ssh credits
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: build
+    steps:
+      - name: Set up SSH
         env:
-          SSH_TOKEN: ${{ secrets.SSH_TOKEN }}
-          SSH_HOST_TOKEN: ${{ vars.SSH_HOST_TOKEN }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_TOKEN" > ~/.ssh/id_ed25519
-          chmod 700 ~/.ssh/id_ed25519
-          echo "$SSH_HOST_TOKEN" > ~/.ssh/known_hosts
-          cat ~/.ssh/known_hosts
-      - env:
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy to server
+        env:
           SSH_USER: ${{ vars.SSH_USER }}
           SSH_HOST: ${{ vars.SSH_HOST }}
-        run: ssh $SSH_USER@$SSH_HOST "cd /srv/study-link-deploy/ && sed -i 's/^API_IMAGE_TAG=.*/API_IMAGE_TAG=${{ env.IMAGE_TAG }}/' versions.env && docker compose --env-file .env --env-file versions.env up -d --wait"
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        run: ssh "$SSH_USER@$SSH_HOST" "$DEPLOY_PATH/deploy.sh api $IMAGE_TAG"
