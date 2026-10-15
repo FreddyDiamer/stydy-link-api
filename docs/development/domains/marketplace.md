@@ -29,7 +29,7 @@ Student posts Request ─► Tutor sends RequestResponse ──► Student accep
 
 ## Invariants
 
-- A deal originates **only** from an accepted response — `POST /marketplace/deals` exists but the normal path is response acceptance
+- A deal originates **only** from an accepted response — there is no endpoint to create one directly. A direct `POST` let anyone open a deal with any user, confirm it alone and, after the auto-confirm, review them
 - One response per `(studentId, serviceId)` and per `(tutorId, requestId)` — enforced by `@@unique`
 - One review per deal **per author** (`@@unique([dealId, authorId])`) — both sides can review each other
 - Response statuses: `PENDING / ACCEPTED / REJECTED / EXPIRED`; a response with a deal cannot be deleted
@@ -42,6 +42,7 @@ Every accept/reject/create/complete transition fires a fire-and-forget Telegram 
 
 ## Common mistakes
 
-- Creating a deal directly instead of accepting a response — bypasses the response status update and the one-response-per-pair invariant
+- Creating a deal directly instead of accepting a response — bypasses the counterparty's consent, the response status update and the one-response-per-pair invariant
+- Including whole `User` rows (`student: true`) in responses — use `PUBLIC_USER_SELECT` from `users.service.ts`; the full row carries `telegramId`, `balance` and notification settings
 - Forgetting the ownership check on a new mutating endpoint — copy the pattern from `ServiceResponsesService.accept()`
 - Treating `budgetType` / `proposedDeadlineType` as authoritative — the real values are `price` and `proposedDeadline`

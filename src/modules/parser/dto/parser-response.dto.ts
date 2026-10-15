@@ -59,11 +59,19 @@ export class ParseResultDto {
   groupsProcessed: number;
 
   @ApiProperty({
-    description: 'Количество обработанных предметов',
+    description: 'Количество уникальных предметов в расписаниях групп',
     example: 25,
   })
   @IsNumber()
   subjectsProcessed: number;
+
+  @ApiProperty({
+    description:
+      'Количество найденных пар группа–предмет–преподаватель (связей из расписаний)',
+    example: 120,
+  })
+  @IsNumber()
+  relationsProcessed: number;
 
   @ApiProperty({
     description: 'Количество ошибок',

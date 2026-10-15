@@ -165,7 +165,7 @@ export class ServiceQueryDto extends ServiceFilterDto {
     default: 1,
   })
   @IsOptional()
-  @Transform(({ value }) => parseInt(value))
+  @Transform(({ value }) => parseInt(String(value), 10))
   @IsInt()
   @Min(1)
   page?: number = 1;
@@ -177,7 +177,7 @@ export class ServiceQueryDto extends ServiceFilterDto {
     default: 10,
   })
   @IsOptional()
-  @Transform(({ value }) => parseInt(value))
+  @Transform(({ value }) => parseInt(String(value), 10))
   @IsInt()
   @Min(1)
   @Max(100)

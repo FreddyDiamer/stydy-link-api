@@ -1,17 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
-  IsNotEmpty,
   IsUUID,
   IsOptional,
   IsNumber,
   Min,
   Max,
   IsInt,
-  IsDateString,
   IsEnum,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export type DealStatus =
   | 'PENDING'
@@ -19,57 +17,6 @@ export type DealStatus =
   | 'IN_PROGRESS'
   | 'COMPLETED'
   | 'CANCELLED';
-
-export class CreateDealDto {
-  @ApiProperty({ description: 'ID студента', example: '...' })
-  @IsString()
-  @IsNotEmpty()
-  @IsUUID()
-  studentId: string;
-
-  @ApiProperty({ description: 'ID репетитора', example: '...' })
-  @IsString()
-  @IsNotEmpty()
-  @IsUUID()
-  tutorId: string;
-
-  @ApiProperty({ description: 'ID предмета', example: '...' })
-  @IsString()
-  @IsNotEmpty()
-  @IsUUID()
-  subjectId: string;
-
-  @ApiProperty({ description: 'ID преподавателя', example: '...' })
-  @IsString()
-  @IsNotEmpty()
-  @IsUUID()
-  teacherId: string;
-
-  @ApiPropertyOptional({ description: 'Цена', example: 10000 })
-  @IsOptional()
-  @IsNumber()
-  @Min(100)
-  @Max(10000000)
-  price: number;
-
-  @ApiPropertyOptional({
-    description: 'Дедлайн',
-    example: '2024-06-01T10:00:00.000Z',
-  })
-  @IsOptional()
-  @IsDateString()
-  deadline: string;
-
-  @ApiPropertyOptional({ description: 'ID отклика на услугу' })
-  @IsOptional()
-  @IsUUID()
-  serviceResponseId?: string;
-
-  @ApiPropertyOptional({ description: 'ID отклика на заявку' })
-  @IsOptional()
-  @IsUUID()
-  requestResponseId?: string;
-}
 
 export class CancelDealDto {
   @ApiPropertyOptional({
@@ -121,12 +68,14 @@ export class DealFilterDto {
 
   @ApiPropertyOptional({ description: 'Минимальная цена' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   minPrice?: number;
 
   @ApiPropertyOptional({ description: 'Максимальная цена' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   maxPrice?: number;

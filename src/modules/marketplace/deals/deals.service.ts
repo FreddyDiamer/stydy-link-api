@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../../../database/database.service';
-import { CreateDealDto, DealFilterDto } from './dto/deal.dto';
+import { DealFilterDto } from './dto/deal.dto';
+import { PUBLIC_USER_SELECT } from '../../users/users.service';
 import {
   BaseService,
   BusinessException,
@@ -74,103 +75,6 @@ export class DealsService extends BaseService {
     super();
   }
 
-  async create(dto: CreateDealDto, initiatorUserId: string) {
-    // Создавать сделку может только её участник
-    if (initiatorUserId !== dto.studentId && initiatorUserId !== dto.tutorId) {
-      throw new ForbiddenException(
-        'Нельзя создавать сделки от имени других пользователей',
-      );
-    }
-    // Проверка существования участников и связей
-    const [student, tutor, subject, teacher] = await Promise.all([
-      this.db.user.findUnique({ where: { id: dto.studentId } }),
-      this.db.user.findUnique({ where: { id: dto.tutorId } }),
-      this.db.subject.findUnique({ where: { id: dto.subjectId } }),
-      this.db.teacher.findUnique({ where: { id: dto.teacherId } }),
-    ]);
-    if (!student) throw new NotFoundException('User', dto.studentId);
-    if (!tutor) throw new NotFoundException('User', dto.tutorId);
-    if (!subject) throw new NotFoundException('Subject', dto.subjectId);
-    if (!teacher) throw new NotFoundException('Teacher', dto.teacherId);
-    // Отклик должен принадлежать именно этой паре студент-репетитор
-    if (dto.serviceResponseId) {
-      const response = await this.db.serviceResponse.findUnique({
-        where: { id: dto.serviceResponseId },
-        include: { service: { select: { tutorId: true } } },
-      });
-      if (!response) {
-        throw new NotFoundException('ServiceResponse', dto.serviceResponseId);
-      }
-      if (
-        response.studentId !== dto.studentId ||
-        response.service.tutorId !== dto.tutorId
-      ) {
-        throw new BusinessException(
-          'Отклик не соответствует участникам сделки',
-        );
-      }
-      const exists = await this.db.deal.findFirst({
-        where: { serviceResponseId: dto.serviceResponseId },
-      });
-      if (exists)
-        throw new BusinessException('Сделка по этому отклику уже существует.');
-    }
-    if (dto.requestResponseId) {
-      const response = await this.db.requestResponse.findUnique({
-        where: { id: dto.requestResponseId },
-        include: { request: { select: { studentId: true } } },
-      });
-      if (!response) {
-        throw new NotFoundException('RequestResponse', dto.requestResponseId);
-      }
-      if (
-        response.tutorId !== dto.tutorId ||
-        response.request.studentId !== dto.studentId
-      ) {
-        throw new BusinessException(
-          'Отклик не соответствует участникам сделки',
-        );
-      }
-      const exists = await this.db.deal.findFirst({
-        where: { requestResponseId: dto.requestResponseId },
-      });
-      if (exists)
-        throw new BusinessException('Сделка по этому отклику уже существует.');
-    }
-    // Создание сделки
-    const deal = await this.db.deal.create({
-      data: {
-        studentId: dto.studentId,
-        tutorId: dto.tutorId,
-        subjectId: dto.subjectId,
-        teacherId: dto.teacherId,
-        price: dto.price,
-        deadline: dto.deadline,
-        status: 'PENDING',
-        serviceResponseId: dto.serviceResponseId,
-        requestResponseId: dto.requestResponseId,
-      },
-    });
-    if (initiatorUserId && subject) {
-      const recipientUserId =
-        initiatorUserId === dto.studentId ? dto.tutorId : dto.studentId;
-      const actorName =
-        initiatorUserId === dto.studentId
-          ? (student as { name: string }).name
-          : (tutor as { name: string }).name;
-      void this.notificationService.notifyDealCreated({
-        recipientUserId,
-        actorName,
-        actorUserId: initiatorUserId,
-        dealId: deal.id,
-        subjectName: (subject as { name: string }).name,
-        price: deal.price ?? undefined,
-        deadline: deal.deadline ?? undefined,
-      });
-    }
-    return deal;
-  }
-
   async findAll(
     pagination: PaginationDto,
     filter: DealFilterDto,
@@ -202,8 +106,8 @@ export class DealsService extends BaseService {
         take: pagination.limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          student: true,
-          tutor: true,
+          student: { select: PUBLIC_USER_SELECT },
+          tutor: { select: PUBLIC_USER_SELECT },
           subject: true,
           teacher: true,
           serviceResponse: true,
@@ -211,7 +115,7 @@ export class DealsService extends BaseService {
             include: {
               request: {
                 include: {
-                  student: true,
+                  student: { select: PUBLIC_USER_SELECT },
                   subject: true,
                   teacher: true,
                 },
@@ -241,8 +145,8 @@ export class DealsService extends BaseService {
     const item = await this.db.deal.findUnique({
       where: { id },
       include: {
-        student: true,
-        tutor: true,
+        student: { select: PUBLIC_USER_SELECT },
+        tutor: { select: PUBLIC_USER_SELECT },
         subject: true,
         teacher: true,
         serviceResponse: true,
@@ -250,7 +154,7 @@ export class DealsService extends BaseService {
           include: {
             request: {
               include: {
-                student: true,
+                student: { select: PUBLIC_USER_SELECT },
                 subject: true,
                 teacher: true,
               },
@@ -296,15 +200,19 @@ export class DealsService extends BaseService {
       where: { id },
       data: { status: DEAL_STATUS.ACCEPTED, updatedAt: new Date() },
       include: {
-        student: true,
-        tutor: true,
+        student: { select: PUBLIC_USER_SELECT },
+        tutor: { select: PUBLIC_USER_SELECT },
         subject: true,
         teacher: true,
         serviceResponse: true,
         requestResponse: {
           include: {
             request: {
-              include: { student: true, subject: true, teacher: true },
+              include: {
+                student: { select: PUBLIC_USER_SELECT },
+                subject: true,
+                teacher: true,
+              },
             },
           },
         },
@@ -337,15 +245,19 @@ export class DealsService extends BaseService {
       where: { id },
       data: { status: DEAL_STATUS.CANCELLED, updatedAt: new Date() },
       include: {
-        student: true,
-        tutor: true,
+        student: { select: PUBLIC_USER_SELECT },
+        tutor: { select: PUBLIC_USER_SELECT },
         subject: true,
         teacher: true,
         serviceResponse: true,
         requestResponse: {
           include: {
             request: {
-              include: { student: true, subject: true, teacher: true },
+              include: {
+                student: { select: PUBLIC_USER_SELECT },
+                subject: true,
+                teacher: true,
+              },
             },
           },
         },
@@ -398,15 +310,19 @@ export class DealsService extends BaseService {
         updatedAt: new Date(),
       },
       include: {
-        student: true,
-        tutor: true,
+        student: { select: PUBLIC_USER_SELECT },
+        tutor: { select: PUBLIC_USER_SELECT },
         subject: true,
         teacher: true,
         serviceResponse: true,
         requestResponse: {
           include: {
             request: {
-              include: { student: true, subject: true, teacher: true },
+              include: {
+                student: { select: PUBLIC_USER_SELECT },
+                subject: true,
+                teacher: true,
+              },
             },
           },
         },
@@ -468,15 +384,19 @@ export class DealsService extends BaseService {
         updatedAt: now,
       },
       include: {
-        student: true,
-        tutor: true,
+        student: { select: PUBLIC_USER_SELECT },
+        tutor: { select: PUBLIC_USER_SELECT },
         subject: true,
         teacher: true,
         serviceResponse: true,
         requestResponse: {
           include: {
             request: {
-              include: { student: true, subject: true, teacher: true },
+              include: {
+                student: { select: PUBLIC_USER_SELECT },
+                subject: true,
+                teacher: true,
+              },
             },
           },
         },
@@ -593,15 +513,19 @@ export class DealsService extends BaseService {
         updatedAt: new Date(),
       },
       include: {
-        student: true,
-        tutor: true,
+        student: { select: PUBLIC_USER_SELECT },
+        tutor: { select: PUBLIC_USER_SELECT },
         subject: true,
         teacher: true,
         serviceResponse: true,
         requestResponse: {
           include: {
             request: {
-              include: { student: true, subject: true, teacher: true },
+              include: {
+                student: { select: PUBLIC_USER_SELECT },
+                subject: true,
+                teacher: true,
+              },
             },
           },
         },

@@ -11,7 +11,7 @@ import {
 } from '@common';
 
 /** Поля пользователя, которые можно показывать другим пользователям */
-const PUBLIC_USER_SELECT = {
+export const PUBLIC_USER_SELECT = {
   id: true,
   name: true,
   telegramUsername: true,

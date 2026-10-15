@@ -104,11 +104,18 @@ export class RequestsController {
   @Get('by-student/:studentId')
   @ApiOperation({
     summary: 'Получить заявки студента',
-    description: 'Получить все заявки конкретного студента',
+    description:
+      'Открытые заявки студента; автору — все его заявки с откликами',
   })
   @ApiSuccessResponse(RequestResponseDto)
-  async findByStudent(@Param('studentId', ParseUUIDPipe) studentId: string) {
-    const requests = await this.requestsService.findByStudent(studentId);
+  async findByStudent(
+    @Param('studentId', ParseUUIDPipe) studentId: string,
+    @CurrentUser() user: User,
+  ) {
+    const requests = await this.requestsService.findByStudent(
+      studentId,
+      user.id,
+    );
     return {
       items: requests,
       total: requests.length,

@@ -353,9 +353,17 @@ export class RequestsService extends BaseService {
     return items;
   }
 
-  async findByStudent(studentId: string): Promise<Request[]> {
+  /**
+   * Заявки студента. Автор видит все свои заявки с откликами; остальные —
+   * только открытые и без откликов: кто откликнулся, знает лишь автор заявки.
+   */
+  async findByStudent(
+    studentId: string,
+    viewerId: string = studentId,
+  ): Promise<Request[]> {
+    const isOwner = viewerId === studentId;
     return this.db.request.findMany({
-      where: { studentId },
+      where: isOwner ? { studentId } : { studentId, status: 'OPEN' },
       orderBy: { createdAt: 'desc' },
       include: {
         subject: {
@@ -370,7 +378,7 @@ export class RequestsService extends BaseService {
             fullName: true,
           },
         },
-        responses: {
+        responses: isOwner && {
           select: {
             id: true,
             tutor: {

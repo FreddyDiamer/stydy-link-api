@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { WorkerSyncService } from './sync-service';
 import { KaiApiClient } from './kai-api-client';
 import { retry, normalizeError, sleep } from './logger';
+import { normalizeSubjectName } from './subject-name';
 
 export class MainParser {
   private result: ParseResultDto;
@@ -43,7 +44,7 @@ export class MainParser {
       this.completeResult();
 
       console.log(
-        `[ParserWorker] Completed: ${this.result.teachersProcessed} teachers, ${this.result.groupsProcessed} groups, ${this.result.subjectsProcessed} subjects`,
+        `[ParserWorker] Completed: ${this.result.teachersProcessed} teachers, ${this.result.groupsProcessed} groups, ${this.result.subjectsProcessed} subjects, ${this.result.relationsProcessed} relations`,
       );
 
       return this.result;
@@ -84,7 +85,11 @@ export class MainParser {
           const relations: { teacherId: string; subjectName: string }[] = [];
 
           for (const schedule of groupSchedule) {
-            allSubjects.add(schedule.disciplName);
+            const subjectName = normalizeSubjectName(schedule.disciplName);
+            if (!subjectName) {
+              continue;
+            }
+            allSubjects.add(subjectName);
 
             const teacher = teacherCache.get(schedule.prepodLogin);
             if (!teacher) {
@@ -93,7 +98,7 @@ export class MainParser {
 
             relations.push({
               teacherId: teacher.id,
-              subjectName: schedule.disciplName,
+              subjectName,
             });
           }
 
@@ -106,7 +111,7 @@ export class MainParser {
         }
       },
       (count) => {
-        this.result.subjectsProcessed += count;
+        this.result.relationsProcessed += count;
       },
       (batchIndex, totalBatches, processed) => {
         console.log(
@@ -115,6 +120,7 @@ export class MainParser {
       },
     );
 
+    this.result.subjectsProcessed = allSubjects.size;
     if (allSubjects.size > 0) {
       await this.syncService.syncSubjectsBatch(Array.from(allSubjects));
     }
@@ -244,6 +250,7 @@ export class MainParser {
       teachersProcessed: 0,
       groupsProcessed: 0,
       subjectsProcessed: 0,
+      relationsProcessed: 0,
       errorCount: 0,
       errors: [],
     };

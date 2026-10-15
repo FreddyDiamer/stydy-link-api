@@ -36,16 +36,6 @@ const baseDeal = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const createDto = (overrides: Record<string, unknown> = {}) => ({
-  studentId: STUDENT,
-  tutorId: TUTOR,
-  subjectId: 'subject-1',
-  teacherId: 'teacher-1',
-  price: 100000,
-  deadline: '2026-12-01T10:00:00.000Z',
-  ...overrides,
-});
-
 describe('DealsService', () => {
   let service: DealsService;
   let db: DatabaseMock;
@@ -74,93 +64,6 @@ describe('DealsService', () => {
     db.teacher.findUnique.mockResolvedValue({ id: 'teacher-1' });
     db.deal.findFirst.mockResolvedValue(null);
     db.deal.create.mockResolvedValue({ id: 'deal-1', price: 100000 });
-  });
-
-  describe('создание', () => {
-    it('разрешено участнику сделки', async () => {
-      await service.create(createDto(), STUDENT);
-
-      expect(db.deal.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            studentId: STUDENT,
-            tutorId: TUTOR,
-            status: 'PENDING',
-          }),
-        }),
-      );
-    });
-
-    it('запрещено постороннему пользователю', async () => {
-      await expectBusinessError(() => service.create(createDto(), OUTSIDER), {
-        code: 'FORBIDDEN',
-        status: 403,
-      });
-      expect(db.deal.create).not.toHaveBeenCalled();
-    });
-
-    it('отклоняет отклик на услугу от другой пары участников', async () => {
-      db.serviceResponse.findUnique.mockResolvedValue({
-        id: 'sr-1',
-        studentId: 'another-student',
-        service: { tutorId: TUTOR },
-      });
-
-      await expectBusinessError(
-        () => service.create(createDto({ serviceResponseId: 'sr-1' }), STUDENT),
-        { status: 400 },
-      );
-      expect(db.deal.create).not.toHaveBeenCalled();
-    });
-
-    it('принимает отклик на услугу, соответствующий участникам', async () => {
-      db.serviceResponse.findUnique.mockResolvedValue({
-        id: 'sr-1',
-        studentId: STUDENT,
-        service: { tutorId: TUTOR },
-      });
-
-      await service.create(createDto({ serviceResponseId: 'sr-1' }), STUDENT);
-
-      expect(db.deal.create).toHaveBeenCalled();
-    });
-
-    it('отклоняет отклик на заявку от другой пары участников', async () => {
-      db.requestResponse.findUnique.mockResolvedValue({
-        id: 'rr-1',
-        tutorId: 'another-tutor',
-        request: { studentId: STUDENT },
-      });
-
-      await expectBusinessError(
-        () => service.create(createDto({ requestResponseId: 'rr-1' }), STUDENT),
-        { status: 400 },
-      );
-    });
-
-    it('не создаёт вторую сделку по тому же отклику', async () => {
-      db.serviceResponse.findUnique.mockResolvedValue({
-        id: 'sr-1',
-        studentId: STUDENT,
-        service: { tutorId: TUTOR },
-      });
-      db.deal.findFirst.mockResolvedValue({ id: 'existing-deal' });
-
-      await expectBusinessError(
-        () => service.create(createDto({ serviceResponseId: 'sr-1' }), STUDENT),
-        { status: 400 },
-      );
-      expect(db.deal.create).not.toHaveBeenCalled();
-    });
-
-    it('требует существующего предмета', async () => {
-      db.subject.findUnique.mockResolvedValue(null);
-
-      await expectBusinessError(() => service.create(createDto(), STUDENT), {
-        code: 'NOT_FOUND',
-        status: 404,
-      });
-    });
   });
 
   describe('доступ к чужим сделкам', () => {

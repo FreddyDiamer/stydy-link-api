@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
   Param,
@@ -11,7 +10,6 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DealsService } from './deals.service';
 import {
-  CreateDealDto,
   DealResponseDto,
   DealListQueryDto,
   DealFilterDto,
@@ -25,13 +23,6 @@ import { User } from '@prisma/client';
 @ApiBearerAuth()
 export class DealsController {
   constructor(private readonly service: DealsService) {}
-
-  @Post()
-  @ApiOperation({ summary: 'Создать сделку' })
-  @ApiSuccessResponse(DealResponseDto)
-  create(@Body() dto: CreateDealDto, @CurrentUser() user: User) {
-    return this.service.create(dto, user.id);
-  }
 
   @Get()
   @ApiOperation({

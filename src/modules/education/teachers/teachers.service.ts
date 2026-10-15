@@ -10,7 +10,6 @@ import {
   BaseService,
   BusinessException,
   NotFoundException,
-  PaginatedResult,
   PaginationDto,
 } from '@common';
 
@@ -141,8 +140,7 @@ export class TeachersService extends BaseService {
   }
 
   async findByForeignId(foreignId: string): Promise<Teacher | null> {
-    // TODO: Реализовать после обновления Prisma client
-    return null;
+    return this.db.teacher.findUnique({ where: { foreignId } });
   }
 
   async findActiveTeachers(): Promise<Teacher[]> {

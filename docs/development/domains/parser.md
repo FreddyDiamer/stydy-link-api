@@ -6,7 +6,7 @@ Fetches groups, subjects, and teachers from the university's API and syncs them 
 
 | File                                                 | Purpose                                                                                                                                                 |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/modules/parser/parser.controller.ts`            | `POST /parser/sync` (awaits result) and `POST /parser/async` (background) — JWT required                                                                |
+| `src/modules/parser/parser.controller.ts`            | `POST /parser/sync` (awaits result) and `POST /parser/async` (background) — admins only (`AdminGuard`)                                                  |
 | `src/modules/parser/services/parser.service.ts`      | Spawns the worker, 30-minute timeout, single-run lock, returns `ParseResultDto`                                                                         |
 | `src/modules/parser/workers/main-parser.worker.ts`   | Worker entrypoint (`worker_threads`)                                                                                                                    |
 | `src/modules/parser/workers/utils/kai-api-client.ts` | HTTP client for the university (KAI) API: groups and schedules from `kai.ru/web/studentu/raspisanie1`, teachers from `kai.ru/web/sotrudniku/raspisanie` |
@@ -20,13 +20,13 @@ Fetches groups, subjects, and teachers from the university's API and syncs them 
 3. `sync-service` upserts rows matching on `foreignId` (see [education.md](education.md)); university-specific extras go into the `data Json?` column.
 4. The parse has a **30-minute timeout**; on timeout the worker is terminated and the sync fails.
 
-`POST /parser/sync` blocks until done (minutes); `POST /parser/async` returns `{ message: 'Parsing started' }` immediately (its worker errors are logged, not thrown). Both require a JWT, and only one sync runs at a time — a second call returns `409 PARSER_BUSY`.
+`POST /parser/sync` blocks until done (minutes); `POST /parser/async` returns `{ message: 'Parsing started' }` immediately (its worker errors are logged, not thrown). Both are admin-only: the caller's `telegramId` must be in `ADMIN_TELEGRAM_IDS`, otherwise 403 (empty variable — nobody). Only one sync runs at a time — a second call returns `409 PARSER_BUSY`.
 
 ## Multi-university note
 
 Any non-2xx answer from kai.ru, 404 included, is an error: it is retried and then lands in the result's `errors`. A moved page therefore shows up as errors, never as a quiet run with zero rows — check `errorCount` and the per-table counts after every sync.
 
-The result's `subjectsProcessed` counts the teacher–subject pairs found in schedules, not subjects: it stays 0 when no teachers are synced even though subjects are written.
+The result counts `subjectsProcessed` — unique subjects found in group schedules — and `relationsProcessed` — group–subject–teacher pairs; relations stay 0 when no teachers are synced even though subjects are written. Subject names are normalized (`subject-name.ts`: trimmed, inner whitespace collapsed) before they are stored or matched, because subjects are unique by exact name.
 
 The client is KAI-specific today (`kai-api-client.ts`), but the schema is university-agnostic (`foreignId` + `data`). A new university means a new API client + parser implementation feeding the same `sync-service` contract — not new columns.
 

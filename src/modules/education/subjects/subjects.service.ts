@@ -10,7 +10,6 @@ import {
   BaseService,
   BusinessException,
   NotFoundException,
-  PaginatedResult,
   PaginationDto,
 } from '@common';
 

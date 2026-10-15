@@ -10,6 +10,7 @@ import {
   IsDateString,
   IsEnum,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PaginationDto } from '@common';
 
 export type ResponseStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
@@ -111,12 +112,14 @@ export class RequestResponseFilterDto extends PaginationDto {
 
   @ApiPropertyOptional({ description: 'Минимальная цена' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   minPrice?: number;
 
   @ApiPropertyOptional({ description: 'Максимальная цена' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   maxPrice?: number;

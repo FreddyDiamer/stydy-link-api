@@ -6,8 +6,33 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 import { BusinessException } from '../exceptions/business.exception';
+
+/** Ответ HttpException: строка или объект с message (строкой или массивом) */
+type HttpErrorBody = string | { message?: string | string[]; error?: string };
+
+/**
+ * Ошибки Prisma, которые означают ошибку клиента, а не сервера: гонка двух
+ * одинаковых запросов упирается в уникальный ключ, запись исчезла между
+ * проверкой и изменением. Без этого такие запросы отвечали 500.
+ */
+const PRISMA_CLIENT_ERRORS: Record<
+  string,
+  { status: HttpStatus; error: string; message: string }
+> = {
+  P2002: {
+    status: HttpStatus.CONFLICT,
+    error: 'CONFLICT',
+    message: 'Такая запись уже существует',
+  },
+  P2025: {
+    status: HttpStatus.NOT_FOUND,
+    error: 'NOT_FOUND',
+    message: 'Запись не найдена',
+  },
+};
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -16,27 +41,39 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<Request & { user?: { id?: string } }>();
 
     let status: number;
-    let message: string;
+    let message: string | string[];
     let error: string;
+
+    const prismaError =
+      exception instanceof Prisma.PrismaClientKnownRequestError
+        ? PRISMA_CLIENT_ERRORS[exception.code]
+        : undefined;
 
     if (exception instanceof BusinessException) {
       // Наши кастомные бизнес-ошибки
       status = exception.getStatus();
-      const errorResponse = exception.getResponse() as any;
+      const errorResponse = exception.getResponse() as {
+        message: string;
+        error: string;
+      };
       message = errorResponse.message;
       error = errorResponse.error;
     } else if (exception instanceof HttpException) {
       // Стандартные HTTP ошибки
       status = exception.getStatus();
-      const errorResponse = exception.getResponse();
+      const errorResponse = exception.getResponse() as HttpErrorBody;
       message =
         typeof errorResponse === 'string'
           ? errorResponse
-          : (errorResponse as any).message;
+          : (errorResponse.message ?? exception.message);
       error = exception.constructor.name;
+    } else if (prismaError) {
+      status = prismaError.status;
+      message = prismaError.message;
+      error = prismaError.error;
     } else {
       // Неожиданные ошибки
       status = HttpStatus.INTERNAL_SERVER_ERROR;
@@ -45,12 +82,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
       // Логируем неожиданные ошибки
       this.logger.error(
-        `Unexpected error: ${exception}`,
+        `Unexpected error: ${exception instanceof Error ? exception.message : String(exception)}`,
         exception instanceof Error ? exception.stack : undefined,
         {
           url: request.url,
           method: request.method,
-          user: (request as any).user?.id,
+          user: request.user?.id,
         },
       );
     }

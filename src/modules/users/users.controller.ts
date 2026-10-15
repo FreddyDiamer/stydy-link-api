@@ -45,26 +45,6 @@ export class UsersController {
     return this.usersService.findOne(user.id);
   }
 
-  @Get('with-services')
-  @ApiOperation({
-    summary: 'Получить пользователей с услугами',
-    description: 'Получить список пользователей которые предоставляют услуги',
-  })
-  @ApiSuccessResponse(UserResponseDto)
-  async findUsersWithServices(@Query() query: UserFilterDto) {
-    return this.usersService.findAll(query, query);
-  }
-
-  @Get('with-requests')
-  @ApiOperation({
-    summary: 'Получить пользователей с заявками',
-    description: 'Получить список пользователей которые создают заявки',
-  })
-  @ApiSuccessResponse(UserResponseDto)
-  async findUsersWithRequests(@Query() query: UserFilterDto) {
-    return this.usersService.findAll(query, query);
-  }
-
   @Get(':id')
   @ApiOperation({
     summary: 'Получить пользователя по ID',

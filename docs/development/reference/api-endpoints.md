@@ -29,16 +29,14 @@ When you add, change, or remove an endpoint, update this table in the same chang
 
 Admin-style endpoints (create/update/delete arbitrary users, verify/activate) were removed: there is no role system, so they let any user edit anyone. List/`:id` responses expose only public fields (no `telegramId`, `balance`, notification settings).
 
-| Method | Path                   | Description                                                  |
-| ------ | ---------------------- | ------------------------------------------------------------ |
-| GET    | `/users`               | List users — public fields only (pagination + filter)        |
-| GET    | `/users/me`            | Current user's full profile                                  |
-| GET    | `/users/with-services` | Users who provide services                                   |
-| GET    | `/users/with-requests` | Users who create requests                                    |
-| GET    | `/users/:id`           | Public profile by ID                                         |
-| GET    | `/users/:id/stats`     | Per-user stats; `balance` included only for own profile      |
-| PATCH  | `/users/me`            | Update own profile (name, group, notification settings only) |
-| PATCH  | `/users/group`         | Change own group                                             |
+| Method | Path               | Description                                                  |
+| ------ | ------------------ | ------------------------------------------------------------ |
+| GET    | `/users`           | List users — public fields only (pagination + filter)        |
+| GET    | `/users/me`        | Current user's full profile                                  |
+| GET    | `/users/:id`       | Public profile by ID                                         |
+| GET    | `/users/:id/stats` | Per-user stats; `balance` included only for own profile      |
+| PATCH  | `/users/me`        | Update own profile (name, group, notification settings only) |
+| PATCH  | `/users/group`     | Change own group                                             |
 
 ## Tutors — `/tutors`
 
@@ -107,20 +105,20 @@ Write endpoints (POST/PATCH/DELETE) were removed from all education controllers:
 
 ## Marketplace — `/marketplace/requests`
 
-| Method | Path                                                             | Description                                        |
-| ------ | ---------------------------------------------------------------- | -------------------------------------------------- |
-| POST   | `/marketplace/requests`                                          | Create request (must be for self)                  |
-| GET    | `/marketplace/requests`                                          | List (filter)                                      |
-| GET    | `/marketplace/requests/open`                                     | Open requests for tutors                           |
-| GET    | `/marketplace/requests/popular`                                  | Most-responded requests (`?limit`)                 |
-| GET    | `/marketplace/requests/my`                                       | Current student's requests                         |
-| GET    | `/marketplace/requests/by-student/:studentId`                    | Requests of a student                              |
-| GET    | `/marketplace/requests/by-subject-teacher/:subjectId/:teacherId` | Requests for a subject+teacher pair                |
-| GET    | `/marketplace/requests/:id`                                      | Request by ID (with responses)                     |
-| PATCH  | `/marketplace/requests/:id`                                      | Update (owner only)                                |
-| PATCH  | `/marketplace/requests/:id/close`                                | Close (owner only); pending responses → `REJECTED` |
-| POST   | `/marketplace/requests/:id/reopen`                               | Reopen as a **new** request (owner only)           |
-| DELETE | `/marketplace/requests/:id`                                      | Delete (owner only)                                |
+| Method | Path                                                             | Description                                                                                                |
+| ------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| POST   | `/marketplace/requests`                                          | Create request (must be for self)                                                                          |
+| GET    | `/marketplace/requests`                                          | List (filter)                                                                                              |
+| GET    | `/marketplace/requests/open`                                     | Open requests for tutors                                                                                   |
+| GET    | `/marketplace/requests/popular`                                  | Most-responded requests (`?limit`)                                                                         |
+| GET    | `/marketplace/requests/my`                                       | Current student's requests                                                                                 |
+| GET    | `/marketplace/requests/by-student/:studentId`                    | A student's `OPEN` requests without responses; the student themself gets all their requests with responses |
+| GET    | `/marketplace/requests/by-subject-teacher/:subjectId/:teacherId` | Requests for a subject+teacher pair                                                                        |
+| GET    | `/marketplace/requests/:id`                                      | Request by ID (with responses)                                                                             |
+| PATCH  | `/marketplace/requests/:id`                                      | Update (owner only)                                                                                        |
+| PATCH  | `/marketplace/requests/:id/close`                                | Close (owner only); pending responses → `REJECTED`                                                         |
+| POST   | `/marketplace/requests/:id/reopen`                               | Reopen as a **new** request (owner only)                                                                   |
+| DELETE | `/marketplace/requests/:id`                                      | Delete (owner only)                                                                                        |
 
 ## Marketplace — `/marketplace/service-responses` (student → service)
 
@@ -150,11 +148,10 @@ Write endpoints (POST/PATCH/DELETE) were removed from all education controllers:
 
 ## Marketplace — `/marketplace/deals`
 
-Generic `PATCH`/`DELETE /deals/:id` were removed (they let anyone rewrite any deal); the lifecycle is fully covered by accept/reject/complete/cancel. Every endpoint is participant-scoped: creation requires being the student or the tutor (and a linked response must match that pair), listing and `:id` return only the caller's deals.
+Generic `PATCH`/`DELETE /deals/:id` were removed (they let anyone rewrite any deal); the lifecycle is fully covered by accept/reject/complete/cancel. There is no `POST /marketplace/deals`: a deal is created only by accepting a response, so both sides have agreed to it. Every endpoint is participant-scoped (listing and `:id` return only the caller's deals), and participants come back as public profiles (`id`, `name`, `telegramUsername`, `avatarUrl`, …) — never `telegramId`, `balance` or notification settings.
 
 | Method | Path                              | Description                                                                                                           |
 | ------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/marketplace/deals`              | Create deal (initiator must be a participant)                                                                         |
 | GET    | `/marketplace/deals`              | Current user's deals (pagination + filter); `role=tutor` / `role=student` — only deals where the caller has that role |
 | GET    | `/marketplace/deals/:id`          | Deal by ID (participants only)                                                                                        |
 | PATCH  | `/marketplace/deals/:id/accept`   | Participant accepts (→ `ACCEPTED`)                                                                                    |
@@ -183,7 +180,7 @@ Generic `PATCH`/`DELETE /deals/:id` were removed (they let anyone rewrite any de
 
 ## Parser — `/parser`
 
-No longer `@Public()`: both endpoints require a Bearer JWT. Only one sync runs at a time — a second call while one is in progress returns `409 PARSER_BUSY`.
+Admins only: the caller's `telegramId` must be listed in `ADMIN_TELEGRAM_IDS` (`AdminGuard`), everyone else gets 403 — with the variable empty nobody can run the parser. Only one sync runs at a time — a second call while one is in progress returns `409 PARSER_BUSY`.
 
 | Method | Path            | Description                                                 |
 | ------ | --------------- | ----------------------------------------------------------- |

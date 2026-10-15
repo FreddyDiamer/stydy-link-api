@@ -357,4 +357,32 @@ describe('RequestsService', () => {
       expect(db.request.delete).not.toHaveBeenCalled();
     });
   });
+
+  describe('заявки конкретного студента', () => {
+    const findManyArg = () =>
+      firstCallArg<ReadArg & { include: { responses: unknown } }>(
+        db.request.findMany,
+      );
+
+    beforeEach(() => {
+      db.request.findMany.mockResolvedValue([]);
+    });
+
+    it('чужим — только открытые заявки и без откликов', async () => {
+      await service.findByStudent(STUDENT, TUTOR);
+
+      expect(findManyArg().where).toEqual({
+        studentId: STUDENT,
+        status: 'OPEN',
+      });
+      expect(findManyArg().include.responses).toBe(false);
+    });
+
+    it('автору — все его заявки с откликами', async () => {
+      await service.findByStudent(STUDENT, STUDENT);
+
+      expect(findManyArg().where).toEqual({ studentId: STUDENT });
+      expect(findManyArg().include.responses).toBeTruthy();
+    });
+  });
 });

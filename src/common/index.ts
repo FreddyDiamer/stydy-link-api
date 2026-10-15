@@ -18,6 +18,7 @@ export * from './decorators/api-response.decorator';
 // Guards
 export * from './guards/jwt-auth.guard';
 export * from './guards/dev-only.guard';
+export * from './guards/admin.guard';
 
 // Pipes
 export * from './pipes/parse-object-id.pipe';

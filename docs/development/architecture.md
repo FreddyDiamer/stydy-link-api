@@ -49,7 +49,7 @@ Every HTTP request passes through, in order:
 }
 ```
 
-6. **`GlobalExceptionFilter`** — converts `BusinessException` subclasses and `HttpException`s into a standard error shape (`statusCode`, `error`, `message`, `path`, `timestamp`); unexpected errors become 500 and are logged with the request context.
+6. **`GlobalExceptionFilter`** — converts `BusinessException` subclasses and `HttpException`s into a standard error shape (`statusCode`, `error`, `message`, `path`, `timestamp`). Prisma's unique-key violation (`P2002`, e.g. two identical requests racing) becomes 409 `CONFLICT` and a vanished record (`P2025`) 404; anything else unexpected becomes 500 and is logged with the request context.
 
 ## Configuration
 
