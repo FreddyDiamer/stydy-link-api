@@ -6,7 +6,7 @@ import {
 import { normalizeError } from './logger';
 
 export class KaiApiClient {
-  private readonly teachersUrl = 'https://kai.ru/for-staff/raspisanie';
+  private readonly teachersUrl = 'https://kai.ru/web/sotrudniku/raspisanie';
   private readonly groupsUrl = 'https://kai.ru/web/studentu/raspisanie1';
 
   private readonly defaultHeaders = {
@@ -35,10 +35,6 @@ export class KaiApiClient {
           Referer: this.teachersUrl,
         },
       });
-
-      if (response.status === 404) {
-        return [];
-      }
 
       if (!response.ok) {
         throw new Error(
@@ -79,10 +75,6 @@ export class KaiApiClient {
           Referer: this.groupsUrl,
         },
       });
-
-      if (response.status === 404) {
-        return [];
-      }
 
       if (!response.ok) {
         throw new Error(
@@ -131,10 +123,6 @@ export class KaiApiClient {
         },
         body: body.toString(),
       });
-
-      if (response.status === 404) {
-        return [];
-      }
 
       if (!response.ok) {
         throw new Error(

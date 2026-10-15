@@ -34,7 +34,11 @@ export class DealsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Список моих сделок' })
+  @ApiOperation({
+    summary: 'Список моих сделок',
+    description:
+      'Сделки, где текущий пользователь — участник; role=tutor или role=student оставляет сделки, где он в этой роли',
+  })
   @ApiSuccessResponse(DealResponseDto)
   findAll(@Query() query: DealListQueryDto, @CurrentUser() user: User) {
     const page = query.page ?? 1;
@@ -48,13 +52,6 @@ export class DealsController {
     void _page;
     void _limit;
     return this.service.findAll(pagination, filter as DealFilterDto, user.id);
-  }
-
-  @Get('my-tutor')
-  @ApiOperation({ summary: 'Мои сделки (репетитор)' })
-  @ApiSuccessResponse(DealResponseDto)
-  findMyTutor(@CurrentUser() user: User, @Query() pagination: PaginationDto) {
-    return this.service.findAll(pagination, { tutorId: user.id }, user.id);
   }
 
   @Patch(':id/accept')

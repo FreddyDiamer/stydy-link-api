@@ -10,6 +10,7 @@ import {
   IsDateString,
   IsEnum,
 } from 'class-validator';
+import { PaginationDto } from '@common';
 
 export type ResponseStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 
@@ -80,7 +81,16 @@ export class UpdateRequestResponseDto {
   proposedDeadline?: string;
 }
 
-export class RequestResponseFilterDto {
+export class RequestResponseFilterDto extends PaginationDto {
+  @ApiPropertyOptional({
+    description:
+      'Чьи отклики: tutor — мои отклики на чужие заявки, student — отклики на мои заявки. Без параметра — и те и другие',
+    enum: ['student', 'tutor'],
+  })
+  @IsOptional()
+  @IsEnum(['student', 'tutor'])
+  role?: 'student' | 'tutor';
+
   @ApiPropertyOptional({ description: 'ID репетитора' })
   @IsOptional()
   @IsUUID()

@@ -62,7 +62,8 @@ export class DevLoginDto {
   telegramId?: string;
 
   @ApiPropertyOptional({
-    description: 'Telegram username для создаваемого dev-пользователя',
+    description:
+      'Telegram username. Без telegramId — вход под существующим пользователем с этим username (регистр не важен, @ допустим), 404 если такого нет. Вместе с telegramId — username создаваемого dev-пользователя.',
     example: 'dev_user',
   })
   @IsString()

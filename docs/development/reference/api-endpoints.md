@@ -20,10 +20,10 @@ When you add, change, or remove an endpoint, update this table in the same chang
 
 ## Dev auth — `/auth/dev` (`dev-auth.controller.ts`, disabled in production)
 
-| Method  | Path              | Description                                                       |
-| ------- | ----------------- | ----------------------------------------------------------------- |
-| 🔓 POST | `/auth/dev/login` | Web login without Telegram (existing `userId` or a test dev user) |
-| 🔓 GET  | `/auth/dev/users` | Users to pick from for web login                                  |
+| Method  | Path              | Description                                                                              |
+| ------- | ----------------- | ---------------------------------------------------------------------------------------- |
+| 🔓 POST | `/auth/dev/login` | Web login without Telegram (existing `userId` or `telegramUsername`, or a test dev user) |
+| 🔓 GET  | `/auth/dev/users` | Users to pick from for web login                                                         |
 
 ## Users — `/users`
 
@@ -124,49 +124,44 @@ Write endpoints (POST/PATCH/DELETE) were removed from all education controllers:
 
 ## Marketplace — `/marketplace/service-responses` (student → service)
 
-| Method | Path                                                           | Description                                                                                         |
-| ------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| POST   | `/marketplace/service-responses`                               | Create response (must be for self)                                                                  |
-| GET    | `/marketplace/service-responses`                               | List (pagination + filter)                                                                          |
-| GET    | `/marketplace/service-responses/my`                            | Current student's responses                                                                         |
-| GET    | `/marketplace/service-responses/by-service/:serviceId`         | All responses to a service                                                                          |
-| GET    | `/marketplace/service-responses/by-service/:serviceId/pending` | Pending responses to a service                                                                      |
-| GET    | `/marketplace/service-responses/:id`                           | Response by ID                                                                                      |
-| GET    | `/marketplace/service-responses/:id/stats`                     | Response stats                                                                                      |
-| PATCH  | `/marketplace/service-responses/:id`                           | Update (author only)                                                                                |
-| PATCH  | `/marketplace/service-responses/:id/accept`                    | Tutor accepts → **creates a Deal** (price: response's, else service's); other bookings stay pending |
-| PATCH  | `/marketplace/service-responses/:id/reject`                    | Tutor rejects                                                                                       |
-| DELETE | `/marketplace/service-responses/:id`                           | Delete (author only, if no deal)                                                                    |
+| Method | Path                                        | Description                                                                                                                                                                                      |
+| ------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/marketplace/service-responses`            | Create response (must be for self)                                                                                                                                                               |
+| GET    | `/marketplace/service-responses`            | Caller's own responses and responses to the caller's services (pagination + filter). `role=student` — own only, `role=tutor` — to own services; `serviceId`, `status`, price, `search` narrow it |
+| GET    | `/marketplace/service-responses/:id`        | Response by ID (author or service owner, else 403)                                                                                                                                               |
+| GET    | `/marketplace/service-responses/:id/stats`  | Response stats (author or service owner, else 403)                                                                                                                                               |
+| PATCH  | `/marketplace/service-responses/:id`        | Update (author only)                                                                                                                                                                             |
+| PATCH  | `/marketplace/service-responses/:id/accept` | Tutor accepts → **creates a Deal** (price: response's, else service's); other bookings stay pending                                                                                              |
+| PATCH  | `/marketplace/service-responses/:id/reject` | Tutor rejects                                                                                                                                                                                    |
+| DELETE | `/marketplace/service-responses/:id`        | Delete (author only, if no deal)                                                                                                                                                                 |
 
 ## Marketplace — `/marketplace/request-responses` (tutor → request)
 
-| Method | Path                                        | Description                            |
-| ------ | ------------------------------------------- | -------------------------------------- |
-| POST   | `/marketplace/request-responses`            | Create response (tutor = current user) |
-| GET    | `/marketplace/request-responses`            | List (filter)                          |
-| GET    | `/marketplace/request-responses/my`         | Current tutor's responses              |
-| GET    | `/marketplace/request-responses/:id`        | Response by ID                         |
-| PATCH  | `/marketplace/request-responses/:id`        | Update content (author only, PENDING)  |
-| PATCH  | `/marketplace/request-responses/:id/accept` | Student accepts → **creates a Deal**   |
-| PATCH  | `/marketplace/request-responses/:id/reject` | Student rejects                        |
-| PATCH  | `/marketplace/request-responses/:id/cancel` | Tutor cancels own response             |
-| DELETE | `/marketplace/request-responses/:id`        | Delete                                 |
+| Method | Path                                        | Description                                                                                                                                                                                      |
+| ------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/marketplace/request-responses`            | Create response (tutor = current user)                                                                                                                                                           |
+| GET    | `/marketplace/request-responses`            | Caller's own responses and responses to the caller's requests (pagination + filter). `role=tutor` — own only, `role=student` — to own requests; `requestId`, `status`, price, `search` narrow it |
+| GET    | `/marketplace/request-responses/:id`        | Response by ID (author or request author, else 403)                                                                                                                                              |
+| PATCH  | `/marketplace/request-responses/:id`        | Update content (author only, PENDING)                                                                                                                                                            |
+| PATCH  | `/marketplace/request-responses/:id/accept` | Student accepts → **creates a Deal**                                                                                                                                                             |
+| PATCH  | `/marketplace/request-responses/:id/reject` | Student rejects                                                                                                                                                                                  |
+| PATCH  | `/marketplace/request-responses/:id/cancel` | Tutor cancels own response                                                                                                                                                                       |
+| DELETE | `/marketplace/request-responses/:id`        | Delete                                                                                                                                                                                           |
 
 ## Marketplace — `/marketplace/deals`
 
 Generic `PATCH`/`DELETE /deals/:id` were removed (they let anyone rewrite any deal); the lifecycle is fully covered by accept/reject/complete/cancel. Every endpoint is participant-scoped: creation requires being the student or the tutor (and a linked response must match that pair), listing and `:id` return only the caller's deals.
 
-| Method | Path                              | Description                                                                                    |
-| ------ | --------------------------------- | ---------------------------------------------------------------------------------------------- |
-| POST   | `/marketplace/deals`              | Create deal (initiator must be a participant)                                                  |
-| GET    | `/marketplace/deals`              | Current user's deals (pagination + filter)                                                     |
-| GET    | `/marketplace/deals/my-tutor`     | Current user's deals as tutor                                                                  |
-| GET    | `/marketplace/deals/:id`          | Deal by ID (participants only)                                                                 |
-| PATCH  | `/marketplace/deals/:id/accept`   | Participant accepts (→ `ACCEPTED`)                                                             |
-| PATCH  | `/marketplace/deals/:id/reject`   | Participant rejects                                                                            |
-| PATCH  | `/marketplace/deals/:id/complete` | Confirm completion from your side (deal closes when both confirm, or after 7-day auto-confirm) |
-| PATCH  | `/marketplace/deals/:id/reopen`   | "Work not ready": clears the other side's confirmation and stops the auto-confirm timer        |
-| PATCH  | `/marketplace/deals/:id/cancel`   | Cancel; optional body `{ reason }` visible to both sides                                       |
+| Method | Path                              | Description                                                                                                           |
+| ------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/marketplace/deals`              | Create deal (initiator must be a participant)                                                                         |
+| GET    | `/marketplace/deals`              | Current user's deals (pagination + filter); `role=tutor` / `role=student` — only deals where the caller has that role |
+| GET    | `/marketplace/deals/:id`          | Deal by ID (participants only)                                                                                        |
+| PATCH  | `/marketplace/deals/:id/accept`   | Participant accepts (→ `ACCEPTED`)                                                                                    |
+| PATCH  | `/marketplace/deals/:id/reject`   | Participant rejects                                                                                                   |
+| PATCH  | `/marketplace/deals/:id/complete` | Confirm completion from your side (deal closes when both confirm, or after 7-day auto-confirm)                        |
+| PATCH  | `/marketplace/deals/:id/reopen`   | "Work not ready": clears the other side's confirmation and stops the auto-confirm timer                               |
+| PATCH  | `/marketplace/deals/:id/cancel`   | Cancel; optional body `{ reason }` visible to both sides                                                              |
 
 ## Reviews — `/reviews`
 

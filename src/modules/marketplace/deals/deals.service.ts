@@ -184,6 +184,8 @@ export class DealsService extends BaseService {
     };
     if (filter.studentId) where.studentId = filter.studentId;
     if (filter.tutorId) where.tutorId = filter.tutorId;
+    if (filter.role === 'tutor') where.tutorId = currentUserId;
+    if (filter.role === 'student') where.studentId = currentUserId;
     if (filter.subjectId) where.subjectId = filter.subjectId;
     if (filter.teacherId) where.teacherId = filter.teacherId;
     if (filter.status)

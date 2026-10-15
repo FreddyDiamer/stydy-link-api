@@ -294,6 +294,89 @@ describe('Маркетплейс (e2e)', () => {
       .expect(400);
   });
 
+  it('отклики видят только их участники', async () => {
+    const outsider = await ctx.db.user.create({
+      data: { telegramId: '1003', telegramUsername: 'outsider', name: 'Чужой' },
+    });
+    const outsiderToken = ctx.tokenFor(outsider.id, outsider.telegramId);
+
+    const req = await createRequest();
+    const requestResponse = await respond(req.id);
+    const service = await createService();
+    const booking = body<{ id: string }>(
+      await request(server)
+        .post('/api/marketplace/service-responses')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ studentId, serviceId: service.id })
+        .expect(201),
+    );
+
+    type Page = { items: { id: string }[]; total: number };
+    const list = async (path: string, token: string) =>
+      body<Page>(
+        await request(server)
+          .get(path)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200),
+      );
+
+    // постороннему чужие отклики не отдаются ни списком, ни по id
+    expect(
+      (await list('/api/marketplace/service-responses', outsiderToken)).total,
+    ).toBe(0);
+    expect(
+      (
+        await list(
+          `/api/marketplace/request-responses?requestId=${req.id}`,
+          outsiderToken,
+        )
+      ).total,
+    ).toBe(0);
+    await request(server)
+      .get(`/api/marketplace/service-responses/${booking.id}`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .expect(403);
+    await request(server)
+      .get(`/api/marketplace/service-responses/${booking.id}/stats`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .expect(403);
+    await request(server)
+      .get(`/api/marketplace/request-responses/${requestResponse.id}`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .expect(403);
+
+    // владелец объявления видит отклики на него, автор — свои
+    const toService = await list(
+      `/api/marketplace/service-responses?role=tutor&serviceId=${service.id}&limit=100`,
+      tutorToken,
+    );
+    expect(toService.items.map((i) => i.id)).toEqual([booking.id]);
+    const toRequest = await list(
+      `/api/marketplace/request-responses?role=student&requestId=${req.id}`,
+      studentToken,
+    );
+    expect(toRequest.items.map((i) => i.id)).toEqual([requestResponse.id]);
+    expect(
+      (
+        await list(
+          '/api/marketplace/service-responses?role=student',
+          studentToken,
+        )
+      ).items.map((i) => i.id),
+    ).toEqual([booking.id]);
+    expect(
+      (
+        await list('/api/marketplace/request-responses?role=tutor', tutorToken)
+      ).items.map((i) => i.id),
+    ).toEqual([requestResponse.id]);
+
+    // неизвестная роль — 400, а не молча пустой список
+    await request(server)
+      .get('/api/marketplace/service-responses?role=admin')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(400);
+  });
+
   it('закрытая заявка выпадает из ленты, но остаётся у автора', async () => {
     const created = await createRequest();
 

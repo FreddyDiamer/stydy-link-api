@@ -82,6 +82,15 @@ export class CancelDealDto {
 }
 
 export class DealFilterDto {
+  @ApiPropertyOptional({
+    description:
+      'Моя роль в сделке: tutor — я репетитор, student — я студент. Без параметра — все мои сделки',
+    enum: ['student', 'tutor'],
+  })
+  @IsOptional()
+  @IsEnum(['student', 'tutor'])
+  role?: 'student' | 'tutor';
+
   @ApiPropertyOptional({ description: 'ID студента' })
   @IsOptional()
   @IsUUID()

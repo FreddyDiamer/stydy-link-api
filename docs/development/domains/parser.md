@@ -4,14 +4,14 @@ Fetches groups, subjects, and teachers from the university's API and syncs them 
 
 ## Key files
 
-| File                                                 | Purpose                                                                                  |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `src/modules/parser/parser.controller.ts`            | `POST /parser/sync` (awaits result) and `POST /parser/async` (background) — JWT required |
-| `src/modules/parser/services/parser.service.ts`      | Spawns the worker, 30-minute timeout, single-run lock, returns `ParseResultDto`          |
-| `src/modules/parser/workers/main-parser.worker.ts`   | Worker entrypoint (`worker_threads`)                                                     |
-| `src/modules/parser/workers/utils/kai-api-client.ts` | HTTP client for the university (KAI) API                                                 |
-| `src/modules/parser/workers/utils/parser-pool.ts`    | Parallelizes fetching across groups                                                      |
-| `src/modules/parser/workers/utils/sync-service.ts`   | Upserts into `Group`, `Subject`, `Teacher`, `GroupSubject`, `GroupSubjectTeacher`        |
+| File                                                 | Purpose                                                                                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/modules/parser/parser.controller.ts`            | `POST /parser/sync` (awaits result) and `POST /parser/async` (background) — JWT required                                                                |
+| `src/modules/parser/services/parser.service.ts`      | Spawns the worker, 30-minute timeout, single-run lock, returns `ParseResultDto`                                                                         |
+| `src/modules/parser/workers/main-parser.worker.ts`   | Worker entrypoint (`worker_threads`)                                                                                                                    |
+| `src/modules/parser/workers/utils/kai-api-client.ts` | HTTP client for the university (KAI) API: groups and schedules from `kai.ru/web/studentu/raspisanie1`, teachers from `kai.ru/web/sotrudniku/raspisanie` |
+| `src/modules/parser/workers/utils/parser-pool.ts`    | Parallelizes fetching across groups                                                                                                                     |
+| `src/modules/parser/workers/utils/sync-service.ts`   | Upserts into `Group`, `Subject`, `Teacher`, `GroupSubject`, `GroupSubjectTeacher`                                                                       |
 
 ## How it runs
 
@@ -24,10 +24,15 @@ Fetches groups, subjects, and teachers from the university's API and syncs them 
 
 ## Multi-university note
 
+Any non-2xx answer from kai.ru, 404 included, is an error: it is retried and then lands in the result's `errors`. A moved page therefore shows up as errors, never as a quiet run with zero rows — check `errorCount` and the per-table counts after every sync.
+
+The result's `subjectsProcessed` counts the teacher–subject pairs found in schedules, not subjects: it stays 0 when no teachers are synced even though subjects are written.
+
 The client is KAI-specific today (`kai-api-client.ts`), but the schema is university-agnostic (`foreignId` + `data`). A new university means a new API client + parser implementation feeding the same `sync-service` contract — not new columns.
 
 ## Common mistakes
 
-- Calling `/parser/sync` casually against a real database — it mass-upserts reference data
+- Calling `/parser/sync` casually against a real database — it mass-upserts reference data. Dry-run first against a local copy of the target database
+- Reading a `completed` status with `errorCount: 0` as success — compare the per-table counts too
 - Editing worker file paths or names without checking `parser.service.ts` — the dev/prod worker resolution breaks silently
 - Doing DB writes in the worker outside `sync-service` — keep the upsert contract in one place

@@ -133,6 +133,18 @@ export class AuthService {
       if (!user) {
         throw new NotFoundException('User', dto.userId);
       }
+    } else if (dto.telegramUsername && !dto.telegramId) {
+      // Вход по username существующего пользователя. Telegram не различает
+      // регистр в username, поэтому ищем без учёта регистра; ведущий @ допустим
+      const username = dto.telegramUsername.replace(/^@/, '');
+      user = await this.db.user.findFirst({
+        where: { telegramUsername: { equals: username, mode: 'insensitive' } },
+        include: { group: true },
+      });
+
+      if (!user) {
+        throw new NotFoundException(`User @${username}`);
+      }
     } else {
       // Создаём/находим тестового пользователя по telegramId
       const telegramId = dto.telegramId ?? 'dev-user';

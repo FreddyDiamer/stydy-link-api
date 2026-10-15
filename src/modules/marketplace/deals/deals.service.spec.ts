@@ -179,6 +179,26 @@ describe('DealsService', () => {
       );
     });
 
+    it('role=tutor оставляет сделки, где текущий пользователь — репетитор', async () => {
+      db.deal.findMany.mockResolvedValue([]);
+      db.deal.count.mockResolvedValue(0);
+
+      await service.findAll(
+        { page: 1, limit: 10, skip: 0 },
+        { role: 'tutor' },
+        STUDENT,
+      );
+
+      expect(db.deal.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [{ studentId: STUDENT }, { tutorId: STUDENT }],
+            tutorId: STUDENT,
+          }),
+        }),
+      );
+    });
+
     it('отдаёт сделку участнику', async () => {
       db.deal.findUnique.mockResolvedValue(baseDeal());
 

@@ -176,12 +176,29 @@ export class ServiceResponsesService extends BaseService {
     }
   }
 
+  /**
+   * Отклики, которые пользователь вправе видеть: свои (как студент) и отклики
+   * на свои услуги (как репетитор). Фильтры сужают выдачу внутри этой области.
+   */
   async findAll(
     paginationDto: PaginationDto,
     filterDto: ServiceResponseFilterDto,
+    currentUserId: string,
   ): Promise<PaginatedResult<ServiceResponse>> {
     try {
-      const where: Prisma.ServiceResponseWhereInput = {};
+      const asStudent: Prisma.ServiceResponseWhereInput = {
+        studentId: currentUserId,
+      };
+      const asTutor: Prisma.ServiceResponseWhereInput = {
+        service: { tutorId: currentUserId },
+      };
+      const scope =
+        filterDto.role === 'student'
+          ? asStudent
+          : filterDto.role === 'tutor'
+            ? asTutor
+            : { OR: [asStudent, asTutor] };
+      const where: Prisma.ServiceResponseWhereInput = { AND: [scope] };
 
       // Фильтры
       if (filterDto.studentId) {
@@ -328,96 +345,22 @@ export class ServiceResponsesService extends BaseService {
     return serviceResponse;
   }
 
-  async findByStudent(studentId: string): Promise<ServiceResponse[]> {
-    return this.db.serviceResponse.findMany({
-      where: { studentId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        service: {
-          include: {
-            tutor: {
-              select: {
-                id: true,
-                name: true,
-                telegramUsername: true,
-              },
-            },
-            subject: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-            teacher: {
-              select: {
-                id: true,
-                fullName: true,
-              },
-            },
-          },
-        },
-        // TODO: добавить deal после обновления Prisma client
-      },
-    });
-  }
-
-  async findByService(serviceId: string): Promise<ServiceResponse[]> {
-    return this.db.serviceResponse.findMany({
-      where: { serviceId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        service: {
-          include: {
-            tutor: {
-              select: {
-                id: true,
-                name: true,
-                telegramUsername: true,
-              },
-            },
-            subject: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-            teacher: {
-              select: {
-                id: true,
-                fullName: true,
-              },
-            },
-          },
-        },
-        student: {
-          select: {
-            id: true,
-            name: true,
-            telegramUsername: true,
-          },
-        },
-        // TODO: добавить deal после обновления Prisma client
-      },
-    });
-  }
-
-  async findPendingByService(serviceId: string): Promise<ServiceResponse[]> {
-    return this.db.serviceResponse.findMany({
-      where: {
-        serviceId,
-        status: 'PENDING',
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        student: {
-          select: {
-            id: true,
-            name: true,
-            telegramUsername: true,
-          },
-        },
-      },
-    });
+  /**
+   * Отклик для чтения через API: видят только автор и владелец услуги.
+   */
+  async findOneForUser(id: string, userId: string): Promise<ServiceResponse> {
+    const serviceResponse = await this.findOne(id);
+    const tutorId = (
+      serviceResponse as ServiceResponse & {
+        service: { tutorId: string };
+      }
+    ).service.tutorId;
+    if (serviceResponse.studentId !== userId && tutorId !== userId) {
+      throw new ForbiddenException(
+        'Отклик видят только его автор и владелец услуги',
+      );
+    }
+    return serviceResponse;
   }
 
   async update(

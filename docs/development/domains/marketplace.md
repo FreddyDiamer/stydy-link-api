@@ -34,6 +34,7 @@ Student posts Request ─► Tutor sends RequestResponse ──► Student accep
 - One review per deal **per author** (`@@unique([dealId, authorId])`) — both sides can review each other
 - Response statuses: `PENDING / ACCEPTED / REJECTED / EXPIRED`; a response with a deal cannot be deleted
 - Only the resource owner mutates it: service/request owners edit their listings, the listing owner accepts/rejects responses, the response author edits/deletes their response
+- Only the two sides see a response: its author and the owner of the service/request. `GET` lists return just the caller's own responses and responses to the caller's listings (narrowed by `role` and the filters); `:id` and `:id/stats` answer 403 to anyone else. Services and requests keep `/my` because their plain `GET` is the public feed
 
 ## Side effects
 

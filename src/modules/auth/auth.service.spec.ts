@@ -246,6 +246,49 @@ describe('AuthService', () => {
       });
     });
 
+    it('входит по username существующего пользователя без учёта регистра и @', async () => {
+      setEnv('development', BOT_TOKEN);
+      db.user.findFirst.mockResolvedValue({ id: 'anna' });
+
+      await expect(
+        service.devLogin({ telegramUsername: '@Anna_Math' }),
+      ).resolves.toMatchObject({ user: { id: 'anna' } });
+      expect(db.user.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            telegramUsername: { equals: 'Anna_Math', mode: 'insensitive' },
+          },
+        }),
+      );
+      expect(db.user.upsert).not.toHaveBeenCalled();
+    });
+
+    it('по неизвестному username отвечает 404 и никого не создаёт', async () => {
+      setEnv('development', BOT_TOKEN);
+      db.user.findFirst.mockResolvedValue(null);
+
+      await expectBusinessError(
+        () => service.devLogin({ telegramUsername: 'nobody' }),
+        { code: 'NOT_FOUND', status: 404 },
+      );
+      expect(db.user.upsert).not.toHaveBeenCalled();
+    });
+
+    it('с telegramId по-прежнему создаёт пользователя, username идёт в профиль', async () => {
+      setEnv('development', BOT_TOKEN);
+      db.user.upsert.mockResolvedValue({ id: 'new' });
+
+      await service.devLogin({ telegramId: '42', telegramUsername: 'new_one' });
+
+      expect(db.user.findFirst).not.toHaveBeenCalled();
+      expect(db.user.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { telegramId: '42' },
+          create: expect.objectContaining({ telegramUsername: 'new_one' }),
+        }),
+      );
+    });
+
     it('запрещён в production', async () => {
       await expectBusinessError(() => service.devLogin({}), {
         code: 'FORBIDDEN',

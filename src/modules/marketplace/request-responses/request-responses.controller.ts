@@ -34,24 +34,29 @@ export class RequestResponsesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Список откликов' })
+  @ApiOperation({
+    summary: 'Список откликов',
+    description:
+      'Отклики, доступные текущему пользователю: свои и отклики на свои заявки. ' +
+      'role=tutor — только свои, role=student — только на свои заявки; ' +
+      'requestId, status и остальные фильтры сужают выдачу',
+  })
   @ApiSuccessResponse(RequestResponseResponseDto)
-  findAll(@Query() filter: RequestResponseFilterDto) {
-    return this.service.findAll(filter);
-  }
-
-  @Get('my')
-  @ApiOperation({ summary: 'Мои отклики на заявки (репетитор)' })
-  @ApiSuccessResponse(RequestResponseResponseDto)
-  findMy(@CurrentUser() user: User) {
-    return this.service.findByTutor(user.id);
+  findAll(
+    @Query() filter: RequestResponseFilterDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.service.findAll(filter, user.id);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Получить отклик по id' })
+  @ApiOperation({
+    summary: 'Получить отклик по id',
+    description: 'Только автор отклика и автор заявки',
+  })
   @ApiSuccessResponse(RequestResponseResponseDto)
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.service.findOneForUser(id, user.id);
   }
 
   @Patch(':id')

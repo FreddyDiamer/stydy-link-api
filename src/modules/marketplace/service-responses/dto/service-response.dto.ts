@@ -118,6 +118,15 @@ export class ServiceResponseFilterDto extends PaginationDto {
   status?: ResponseStatus;
 
   @ApiPropertyOptional({
+    description:
+      'Чьи отклики: student — мои отклики на чужие услуги, tutor — отклики на мои услуги. Без параметра — и те и другие',
+    enum: ['student', 'tutor'],
+  })
+  @IsOptional()
+  @IsEnum(['student', 'tutor'])
+  role?: 'student' | 'tutor';
+
+  @ApiPropertyOptional({
     description: 'Минимальная предложенная цена в копейках',
     example: 50000,
     minimum: 0,

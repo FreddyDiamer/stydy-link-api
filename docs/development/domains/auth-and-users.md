@@ -26,7 +26,16 @@ Telegram-based authentication, JWT issuance, dev login, user profiles, and tutor
 
 ## Dev login
 
-`POST /auth/dev/login` (with optional `userId`) and `GET /auth/dev/users` allow web-based login without Telegram. `AuthService.ensureDevEnvironment()` allows them only when `NODE_ENV=development` — any other environment (production, test, unset) gets 403.
+`POST /auth/dev/login` (with optional `userId`) and `GET /auth/dev/users` allow web-based login without Telegram. They work only when `NODE_ENV=development`; any other environment (production, test, unset) gets 403. `DevOnlyGuard` (`src/common/guards/dev-only.guard.ts`) sits on the whole `DevAuthController`, so a new method there is closed automatically and the guard fires before body validation. `AuthService.ensureDevEnvironment()` repeats the check inside the service as a second line.
+
+`POST /auth/dev/login` picks the user by the first field present in the body:
+
+| Body                                        | Result                                                                             |
+| ------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `userId`                                    | Existing user by id; 404 if missing                                                |
+| `telegramId` (+ `telegramUsername`, `name`) | Found by `telegramId` or created with the given username and name                  |
+| `telegramUsername` only                     | Existing user by username — case-insensitive, leading `@` stripped; 404 if missing |
+| empty                                       | The `dev-user` test account, created on first use                                  |
 
 ## Users
 

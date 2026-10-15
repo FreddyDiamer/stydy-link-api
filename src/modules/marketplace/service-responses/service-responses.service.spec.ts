@@ -8,7 +8,10 @@ import {
   createDatabaseMock,
   expectBusinessError,
   DatabaseMock,
+  firstCallArg,
+  ReadArg,
 } from '../../../test-support/mocks';
+import { ServiceResponseFilterDto } from './dto/service-response.dto';
 
 const STUDENT = 'student-1';
 const TUTOR = 'tutor-1';
@@ -259,6 +262,87 @@ describe('ServiceResponsesService', () => {
 
     it('посторонний не может отклонить отклик', async () => {
       await expectBusinessError(() => sut.reject('sr-1', asUser(OUTSIDER)), {
+        code: 'FORBIDDEN',
+        status: 403,
+      });
+    });
+  });
+
+  describe('видимость откликов', () => {
+    const query = (overrides: Record<string, unknown> = {}) =>
+      ({
+        page: 1,
+        limit: 10,
+        skip: 0,
+        ...overrides,
+      }) as unknown as ServiceResponseFilterDto;
+    const listWhere = () =>
+      firstCallArg<ReadArg>(db.serviceResponse.findMany).where;
+
+    beforeEach(() => {
+      db.serviceResponse.findMany.mockResolvedValue([]);
+      db.serviceResponse.count.mockResolvedValue(0);
+    });
+
+    it('без role отдаёт свои отклики и отклики на свои услуги', async () => {
+      await sut.findAll(query(), query(), STUDENT);
+
+      expect(listWhere().AND).toEqual([
+        { OR: [{ studentId: STUDENT }, { service: { tutorId: STUDENT } }] },
+      ]);
+    });
+
+    it('role=student — только свои отклики', async () => {
+      await sut.findAll(
+        query({ role: 'student' }),
+        query({ role: 'student' }),
+        STUDENT,
+      );
+
+      expect(listWhere().AND).toEqual([{ studentId: STUDENT }]);
+    });
+
+    it('role=tutor — только отклики на свои услуги', async () => {
+      await sut.findAll(
+        query({ role: 'tutor' }),
+        query({ role: 'tutor' }),
+        TUTOR,
+      );
+
+      expect(listWhere().AND).toEqual([{ service: { tutorId: TUTOR } }]);
+    });
+
+    it('фильтр по чужому studentId не расширяет область видимости', async () => {
+      const filter = query({ studentId: OUTSIDER });
+      await sut.findAll(filter, filter, STUDENT);
+
+      expect(listWhere()).toMatchObject({
+        studentId: OUTSIDER,
+        AND: [
+          { OR: [{ studentId: STUDENT }, { service: { tutorId: STUDENT } }] },
+        ],
+      });
+    });
+
+    it('отклик по id видят автор и владелец услуги', async () => {
+      db.serviceResponse.findUnique.mockResolvedValue(
+        response({ service: { tutorId: TUTOR } }),
+      );
+
+      await expect(sut.findOneForUser('sr-1', STUDENT)).resolves.toMatchObject({
+        id: 'sr-1',
+      });
+      await expect(sut.findOneForUser('sr-1', TUTOR)).resolves.toMatchObject({
+        id: 'sr-1',
+      });
+    });
+
+    it('посторонний не видит отклик по id', async () => {
+      db.serviceResponse.findUnique.mockResolvedValue(
+        response({ service: { tutorId: TUTOR } }),
+      );
+
+      await expectBusinessError(() => sut.findOneForUser('sr-1', OUTSIDER), {
         code: 'FORBIDDEN',
         status: 403,
       });

@@ -50,76 +50,45 @@ export class ServiceResponsesController {
   @Get()
   @ApiOperation({
     summary: 'Получить список откликов',
-    description: 'Получить список откликов студентов на услуги с фильтрацией',
+    description:
+      'Отклики, доступные текущему пользователю: свои и отклики на свои услуги. ' +
+      'role=student — только свои, role=tutor — только на свои услуги; ' +
+      'serviceId, status и остальные фильтры сужают выдачу',
   })
   @ApiSuccessResponse(ServiceResponseResponseDto)
-  async findAll(@Query() query: ServiceResponseFilterDto) {
-    return this.serviceResponsesService.findAll(query, query);
-  }
-
-  @Get('my')
-  @ApiOperation({
-    summary: 'Получить мои отклики',
-    description: 'Получить список откликов текущего пользователя-студента',
-  })
-  @ApiSuccessResponse(ServiceResponseResponseDto)
-  async findMy(@CurrentUser() user: User) {
-    const responses = await this.serviceResponsesService.findByStudent(user.id);
-    return {
-      items: responses,
-      total: responses.length,
-    };
-  }
-
-  @Get('by-service/:serviceId')
-  @ApiOperation({
-    summary: 'Получить отклики на услугу',
-    description: 'Получить все отклики на конкретную услугу (для репетитора)',
-  })
-  @ApiSuccessResponse(ServiceResponseResponseDto)
-  async findByService(@Param('serviceId', ParseUUIDPipe) serviceId: string) {
-    const responses =
-      await this.serviceResponsesService.findByService(serviceId);
-    return {
-      items: responses,
-      total: responses.length,
-    };
-  }
-
-  @Get('by-service/:serviceId/pending')
-  @ApiOperation({
-    summary: 'Получить ожидающие отклики на услугу',
-    description: 'Получить отклики на услугу со статусом PENDING',
-  })
-  @ApiSuccessResponse(ServiceResponseResponseDto)
-  async findPendingByService(
-    @Param('serviceId', ParseUUIDPipe) serviceId: string,
+  async findAll(
+    @Query() query: ServiceResponseFilterDto,
+    @CurrentUser() user: User,
   ) {
-    const responses =
-      await this.serviceResponsesService.findPendingByService(serviceId);
-    return {
-      items: responses,
-      total: responses.length,
-    };
+    return this.serviceResponsesService.findAll(query, query, user.id);
   }
 
   @Get(':id')
   @ApiOperation({
     summary: 'Получить отклик по ID',
-    description: 'Получить подробную информацию об отклике',
+    description:
+      'Подробная информация об отклике (только автор и владелец услуги)',
   })
   @ApiSuccessResponse(ServiceResponseResponseDto)
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.serviceResponsesService.findOne(id);
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.serviceResponsesService.findOneForUser(id, user.id);
   }
 
   @Get(':id/stats')
   @ApiOperation({
     summary: 'Получить статистику отклика',
-    description: 'Получить статистику по отклику (сделки, статус)',
+    description:
+      'Статистика по отклику: сделки, статус (только автор и владелец услуги)',
   })
   @ApiSuccessResponse()
-  async getStats(@Param('id', ParseUUIDPipe) id: string) {
+  async getStats(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ) {
+    await this.serviceResponsesService.findOneForUser(id, user.id);
     return this.serviceResponsesService.getResponseStats(id);
   }
 

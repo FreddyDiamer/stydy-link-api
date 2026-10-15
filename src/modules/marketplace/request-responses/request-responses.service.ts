@@ -10,6 +10,7 @@ import {
   BusinessException,
   ForbiddenException,
   NotFoundException,
+  PaginatedResult,
 } from '@common';
 import { Prisma, RequestResponse, User } from '@prisma/client';
 import { NotificationService } from '../../notifications/notification.service';
@@ -80,8 +81,27 @@ export class RequestResponsesService extends BaseService {
     return created;
   }
 
-  async findAll(filter: RequestResponseFilterDto): Promise<RequestResponse[]> {
-    const where: Prisma.RequestResponseWhereInput = {};
+  /**
+   * Отклики, которые пользователь вправе видеть: свои (как репетитор) и отклики
+   * на свои заявки (как студент). Фильтры сужают выдачу внутри этой области.
+   */
+  async findAll(
+    filter: RequestResponseFilterDto,
+    currentUserId: string,
+  ): Promise<PaginatedResult<RequestResponse>> {
+    const asTutor: Prisma.RequestResponseWhereInput = {
+      tutorId: currentUserId,
+    };
+    const asStudent: Prisma.RequestResponseWhereInput = {
+      request: { studentId: currentUserId },
+    };
+    const scope =
+      filter.role === 'tutor'
+        ? asTutor
+        : filter.role === 'student'
+          ? asStudent
+          : { OR: [asTutor, asStudent] };
+    const where: Prisma.RequestResponseWhereInput = { AND: [scope] };
     if (filter.tutorId) where.tutorId = filter.tutorId;
     if (filter.requestId) where.requestId = filter.requestId;
     if (filter.status)
@@ -95,26 +115,51 @@ export class RequestResponsesService extends BaseService {
     if (filter.search?.trim()) {
       where.message = { contains: filter.search.trim(), mode: 'insensitive' };
     }
-    const items = await this.db.requestResponse.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        tutor: {
-          select: {
-            id: true,
-            name: true,
-            telegramUsername: true,
-            avatarUrl: true,
-            createdAt: true,
-            group: { select: { id: true, number: true } },
+    const [items, total] = await Promise.all([
+      this.db.requestResponse.findMany({
+        where,
+        skip: filter.skip,
+        take: filter.limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          tutor: {
+            select: {
+              id: true,
+              name: true,
+              telegramUsername: true,
+              avatarUrl: true,
+              createdAt: true,
+              group: { select: { id: true, number: true } },
+            },
+          },
+          request: {
+            include: {
+              student: {
+                select: {
+                  id: true,
+                  name: true,
+                  telegramUsername: true,
+                  avatarUrl: true,
+                },
+              },
+              subject: { select: { id: true, name: true } },
+              teacher: { select: { id: true, fullName: true } },
+            },
           },
         },
-      },
-    });
+      }),
+      this.db.requestResponse.count({ where }),
+    ]);
 
     await this.attachTutorReputation(items);
 
-    return items;
+    return {
+      items,
+      total,
+      page: filter.page,
+      limit: filter.limit,
+      totalPages: Math.ceil(total / filter.limit),
+    };
   }
 
   /**
@@ -158,44 +203,29 @@ export class RequestResponsesService extends BaseService {
     }
   }
 
-  async findByTutor(tutorId: string) {
-    const items = await this.db.requestResponse.findMany({
-      where: { tutorId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        tutor: {
-          select: {
-            id: true,
-            name: true,
-            telegramUsername: true,
-            avatarUrl: true,
-            createdAt: true,
-            group: { select: { id: true, number: true } },
-          },
-        },
-        request: {
-          include: {
-            student: {
-              select: {
-                id: true,
-                name: true,
-                telegramUsername: true,
-                avatarUrl: true,
-              },
-            },
-            subject: { select: { id: true, name: true } },
-            teacher: { select: { id: true, fullName: true } },
-          },
-        },
-      },
-    });
-    return { items, total: items.length };
-  }
-
   async findOne(id: string) {
     const item = await this.db.requestResponse.findUnique({ where: { id } });
     if (!item) throw new NotFoundException('RequestResponse', id);
     return item;
+  }
+
+  /**
+   * Отклик для чтения через API: видят только автор и автор заявки.
+   */
+  async findOneForUser(id: string, userId: string) {
+    const item = await this.db.requestResponse.findUnique({
+      where: { id },
+      include: { request: { select: { studentId: true } } },
+    });
+    if (!item) throw new NotFoundException('RequestResponse', id);
+    if (item.tutorId !== userId && item.request.studentId !== userId) {
+      throw new ForbiddenException(
+        'Отклик видят только его автор и автор заявки',
+      );
+    }
+    const { request: _request, ...response } = item;
+    void _request;
+    return response;
   }
 
   async update(id: string, dto: UpdateRequestResponseDto, user: User) {

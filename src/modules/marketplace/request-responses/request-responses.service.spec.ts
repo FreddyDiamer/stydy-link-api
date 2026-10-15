@@ -9,8 +9,10 @@ import {
   expectBusinessError,
   firstCallArg,
   type DatabaseMock,
+  type ReadArg,
   type WriteArg,
 } from '../../../test-support/mocks';
+import { RequestResponseFilterDto } from './dto/request-response.dto';
 
 const STUDENT = 'student-1';
 const TUTOR = 'tutor-1';
@@ -308,6 +310,84 @@ describe('RequestResponsesService', () => {
       expect(db.requestResponse.delete).toHaveBeenCalledWith({
         where: { id: 'rr-1' },
       });
+    });
+  });
+
+  describe('видимость откликов', () => {
+    const OUTSIDER = 'outsider-1';
+    const filter = (overrides: Record<string, unknown> = {}) =>
+      ({
+        page: 1,
+        limit: 10,
+        skip: 0,
+        ...overrides,
+      }) as unknown as RequestResponseFilterDto;
+    const listWhere = () =>
+      firstCallArg<ReadArg>(db.requestResponse.findMany).where;
+
+    beforeEach(() => {
+      db.requestResponse.findMany.mockResolvedValue([]);
+      db.requestResponse.count.mockResolvedValue(0);
+      db.review.groupBy.mockResolvedValue([]);
+    });
+
+    it('без role отдаёт свои отклики и отклики на свои заявки', async () => {
+      await service.findAll(filter(), TUTOR);
+
+      expect(listWhere().AND).toEqual([
+        { OR: [{ tutorId: TUTOR }, { request: { studentId: TUTOR } }] },
+      ]);
+    });
+
+    it('role=tutor — только свои отклики', async () => {
+      await service.findAll(filter({ role: 'tutor' }), TUTOR);
+
+      expect(listWhere().AND).toEqual([{ tutorId: TUTOR }]);
+    });
+
+    it('role=student — только отклики на свои заявки', async () => {
+      await service.findAll(
+        filter({ role: 'student', requestId: 'request-1' }),
+        STUDENT,
+      );
+
+      expect(listWhere()).toMatchObject({
+        requestId: 'request-1',
+        AND: [{ request: { studentId: STUDENT } }],
+      });
+    });
+
+    it('отдаёт страницу в формате { items, total, page, limit, totalPages }', async () => {
+      db.requestResponse.findMany.mockResolvedValue([response()]);
+      db.requestResponse.count.mockResolvedValue(11);
+
+      await expect(service.findAll(filter(), TUTOR)).resolves.toMatchObject({
+        total: 11,
+        page: 1,
+        limit: 10,
+        totalPages: 2,
+        items: [expect.objectContaining({ id: 'rr-1' })],
+      });
+    });
+
+    it('отклик по id видят автор и автор заявки', async () => {
+      db.requestResponse.findUnique.mockResolvedValue(response());
+
+      await expect(
+        service.findOneForUser('rr-1', TUTOR),
+      ).resolves.toMatchObject({ id: 'rr-1' });
+      await expect(
+        service.findOneForUser('rr-1', STUDENT),
+      ).resolves.toMatchObject({ id: 'rr-1' });
+    });
+
+    it('посторонний не видит отклик по id', async () => {
+      db.requestResponse.findUnique.mockResolvedValue(response());
+
+      await expectBusinessError(
+        () => service.findOneForUser('rr-1', OUTSIDER),
+        { code: 'FORBIDDEN', status: 403 },
+      );
     });
   });
 });

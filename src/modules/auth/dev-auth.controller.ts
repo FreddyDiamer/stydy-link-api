@@ -1,16 +1,17 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { DevLoginDto, AuthResponseDto } from './dto/auth.dto';
-import { Public, ApiSuccessResponse } from '@common';
+import { Public, ApiSuccessResponse, DevOnlyGuard } from '@common';
 
 /**
  * Веб-авторизация для локальной разработки без Telegram.
  *
- * Все эндпоинты полностью отключены в production (см. AuthService.ensureDevEnvironment):
- * в production окружении вернётся 403 Forbidden.
+ * DevOnlyGuard на классе закрывает каждый метод вне NODE_ENV=development (403),
+ * включая будущие; AuthService.ensureDevEnvironment — второй рубеж.
  */
 @ApiTags('Dev Authentication')
+@UseGuards(DevOnlyGuard)
 @Controller('auth/dev')
 export class DevAuthController {
   constructor(private readonly authService: AuthService) {}
@@ -20,8 +21,9 @@ export class DevAuthController {
   @ApiOperation({
     summary: 'Веб-вход (только dev)',
     description:
-      'Вход без Telegram: под существующим пользователем (userId) либо ' +
-      'создание/получение тестового dev-пользователя. Отключено в production.',
+      'Вход без Telegram: под существующим пользователем (userId или ' +
+      'telegramUsername) либо создание/получение тестового dev-пользователя. ' +
+      'Отключено в production.',
   })
   @ApiSuccessResponse(AuthResponseDto)
   async devLogin(@Body() dto: DevLoginDto): Promise<AuthResponseDto> {
