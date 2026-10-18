@@ -51,6 +51,10 @@ describe('Маркетплейс (e2e)', () => {
     const teacher = await ctx.db.teacher.create({
       data: { fullName: 'Иванов И.И.', foreignId: 'teacher-ext-1' },
     });
+    // заявку и услугу можно создать только на пару, которую преподаватель ведёт
+    await ctx.db.teacherSubject.create({
+      data: { teacherId: teacher.id, subjectId: subject.id },
+    });
 
     studentId = student.id;
     tutorId = tutor.id;

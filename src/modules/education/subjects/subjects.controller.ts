@@ -1,7 +1,11 @@
 import { Controller, Get, Param, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SubjectsService } from './subjects.service';
-import { SubjectResponseDto, SubjectFilterDto } from './dto/subject.dto';
+import {
+  SubjectResponseDto,
+  SubjectFilterDto,
+  SubjectListItemDto,
+} from './dto/subject.dto';
 import { ApiSuccessResponse } from '@common';
 
 /**
@@ -18,9 +22,9 @@ export class SubjectsController {
   @ApiOperation({
     summary: 'Получить список предметов',
     description:
-      'Получить список предметов университета с фильтрацией и пагинацией',
+      'Лёгкий список { id, name, isActive } с пагинацией. По умолчанию только активные (isActive=false — неактивные). search: без учёта регистра; сначала названия, начинающиеся с запроса, затем содержащие его, внутри — по алфавиту',
   })
-  @ApiSuccessResponse(SubjectResponseDto)
+  @ApiSuccessResponse(SubjectListItemDto)
   async findAll(@Query() query: SubjectFilterDto) {
     return this.subjectsService.findAll(query, query);
   }
@@ -28,9 +32,10 @@ export class SubjectsController {
   @Get('active')
   @ApiOperation({
     summary: 'Получить активные предметы',
-    description: 'Получить список активных предметов для выбора в формах',
+    description:
+      'Все активные предметы { id, name, isActive } по алфавиту, в обёртке { items, total }',
   })
-  @ApiSuccessResponse(SubjectResponseDto)
+  @ApiSuccessResponse(SubjectListItemDto)
   async findActive() {
     const subjects = await this.subjectsService.findActive();
     return {

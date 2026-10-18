@@ -147,3 +147,23 @@ export class TeacherSubjectResponseDto {
     isActive: boolean;
   };
 }
+
+export class TeacherSubjectSubjectDto {
+  @ApiProperty({ example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' })
+  id: string;
+
+  @ApiProperty({ example: 'Математика' })
+  name: string;
+}
+
+/** Предмет преподавателя: id связи и сам предмет */
+export class TeacherSubjectOfTeacherDto {
+  @ApiProperty({
+    description: 'ID связи преподаватель–предмет',
+    example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+  })
+  id: string;
+
+  @ApiProperty({ type: TeacherSubjectSubjectDto })
+  subject: TeacherSubjectSubjectDto;
+}

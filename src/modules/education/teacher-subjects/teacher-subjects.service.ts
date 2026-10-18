@@ -13,6 +13,13 @@ import {
   PaginatedResult,
   PaginationDto,
 } from '@common';
+import { compareRu } from '../education-sort';
+
+/** Предмет, который ведёт преподаватель: id связи и сам предмет */
+export interface TeacherSubjectOfTeacher {
+  id: string;
+  subject: { id: string; name: string };
+}
 
 @Injectable()
 export class TeacherSubjectsService extends BaseService {
@@ -248,23 +255,22 @@ export class TeacherSubjectsService extends BaseService {
     });
   }
 
-  async findActiveByTeacher(teacherId: string): Promise<TeacherSubject[]> {
-    return this.db.teacherSubject.findMany({
+  /** Все активные предметы преподавателя, без пагинации: фронту нужен полный список */
+  async findActiveByTeacher(
+    teacherId: string,
+  ): Promise<TeacherSubjectOfTeacher[]> {
+    const links = await this.db.teacherSubject.findMany({
       where: {
         teacherId,
         isActive: true,
+        subject: { isActive: true },
       },
-      include: {
-        subject: {
-          select: {
-            id: true,
-            name: true,
-            isActive: true,
-          },
-        },
+      select: {
+        id: true,
+        subject: { select: { id: true, name: true } },
       },
-      orderBy: { subject: { name: 'asc' } },
     });
+    return links.sort((a, b) => compareRu(a.subject.name, b.subject.name));
   }
 
   async findActiveBySubject(subjectId: string): Promise<TeacherSubject[]> {

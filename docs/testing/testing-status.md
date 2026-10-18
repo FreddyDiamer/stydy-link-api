@@ -2,7 +2,7 @@
 
 What the suite covers today, and the conventions it follows.
 
-## Unit tests (185, no database needed)
+## Unit tests (200, no database needed)
 
 `pnpm test` — every suite mocks the Prisma layer, so it runs anywhere.
 
@@ -23,6 +23,10 @@ What the suite covers today, and the conventions it follows.
 | `marketplace/service-responses/…spec.ts`         | Visibility (own responses + responses to own services, `role`, 403 on a foreign `:id`), own-service and duplicate guards, accept/reject restricted to the service owner, accept creates the deal (response price, else service price), status is not client-writable |
 | `marketplace/services/services.service.spec.ts`  | ACTIVE-only showcase, price filters, own/responded flags, tutor reputation from reviews, delete blocked by responses or deals                                                                                                                                        |
 | `reviews/reviews.service.spec.ts`                | Completed-deal-only, target and role derived server-side, one review per author per deal, reply permissions, reputation split by role                                                                                                                                |
+| `education/groups/groups.service.spec.ts`        | A group's subjects: Russian sort of subjects and teachers, only active schedule rows of this group, subject without teachers → `teachers: []`, no schedule → `[]`, unknown group → 404                                                                               |
+| `education/subjects/subjects.service.spec.ts`    | Light list items, case-insensitive search with prefix matches first, active-only default (`isActive=false` overrides), page sliced after ranking                                                                                                                     |
+| `education/teachers/teachers.service.spec.ts`    | Light list items and prefix-first search; teachers of a subject are all returned, sorted, active links only                                                                                                                                                          |
+| `education/teacher-subjects/…spec.ts`            | A teacher's subjects: all active links with active subjects, `{ id, subject: { id, name } }`, sorted by name                                                                                                                                                         |
 | `users/users.service.spec.ts`                    | Public projections hide `telegramId`/`balance`/notification settings; balance only in your own stats                                                                                                                                                                 |
 
 Shared mocks live in **`src/test-support/mocks.ts`** — that directory is excluded from the production build (`tsconfig.build.json`), which is why the helpers do not sit under `src/common`:
@@ -34,13 +38,14 @@ Shared mocks live in **`src/test-support/mocks.ts`** — that directory is exclu
 
 Jest maps the `@common` / `@config` / `@database` / `@modules` aliases via `moduleNameMapper` in `package.json`.
 
-## E2E (19 tests, real Postgres)
+## E2E (23 tests, real Postgres)
 
 `pnpm run test:e2e` boots the whole app through `AppModule` with the same pipeline as `main.ts` (global `/api` prefix, `ValidationPipe` with whitelist + forbidNonWhitelisted, `GlobalExceptionFilter`) and drives it over HTTP with supertest against a real database.
 
 - `test/marketplace.e2e-spec.ts` — both loops end to end: request → response → accept → deal → both sides confirm → one review from each; and service → booking (no price) → tutor accepts → deal at the service price → both confirm → reviews, with the deal visible to both sides in `GET /marketplace/deals`. Also that a closed request drops out of the feed but stays with its author, that a second review from the same author is refused by the schema's composite unique key, and that ownership checks (accept a booking, suspend or edit a service) answer 403, not 500.
 - `test/marketplace.e2e-spec.ts` also pins response visibility: an outsider gets empty lists and 403 on a foreign response (`:id`, `:id/stats`), each side sees its responses through `role`, and an unknown `role` is a 400.
 - `test/pipeline.e2e-spec.ts` — the parts unit tests cannot see: the global guard (401 without a token, 401 for a token whose user was deleted), the success envelope the frontend's `apiClient` unwraps, `forbidNonWhitelisted` rejecting extra fields (this is what keeps the frontend from sending `authorId` to `/reviews` again), `ParseUUIDPipe`, and error mapping to 403/404 with a body.
+- `test/education.e2e-spec.ts` — catalog reads on a real database: a group's subjects keep only its active schedule and its own teachers (`[]` without a schedule, 404 for an unknown group), subject search is case-insensitive with prefix matches first and light items, and a request on a pair the teacher does not teach is a 400.
 - `test/pipeline.e2e-spec.ts` also covers the Telegram webhook: public but 401 without or with a wrong secret, and a raw Telegram update passes the strict `ValidationPipe` with the right one.
 
 **Setup.** E2E needs its own database — the suite truncates every table before each test, so never point it at a working database.
@@ -56,7 +61,7 @@ pnpm run test:e2e
 
 ## Not covered yet
 
-- Parser sync, notifications delivery and the education module have no tests; the parser has only the kai.ru client spec.
+- Parser sync and notification delivery have no tests; the parser has only the kai.ru client spec.
 - Deal cancellation, reopen and the auto-confirm sweep are covered by unit tests only — no e2e walks those over HTTP yet.
 - Response shapes are inconsistent and e2e records that as fact rather than fixing it: `GET /marketplace/requests` returns an array, `GET /marketplace/requests/my` returns `{ items, total }`. The frontend normalizes both.
 - The frontend has its own suite (vitest) — see the `study-link` repository.

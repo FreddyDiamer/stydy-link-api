@@ -50,3 +50,25 @@ export class GroupResponseDto {
   @ApiProperty()
   updatedAt: string;
 }
+
+export class GroupSubjectTeacherDto {
+  @ApiProperty({ example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' })
+  id: string;
+
+  @ApiProperty({ example: 'Иванов Иван Иванович' })
+  fullName: string;
+}
+
+export class GroupSubjectResponseDto {
+  @ApiProperty({ example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' })
+  id: string;
+
+  @ApiProperty({ example: 'Математический анализ' })
+  name: string;
+
+  @ApiProperty({
+    description: 'Преподаватели этого предмета именно в этой группе',
+    type: [GroupSubjectTeacherDto],
+  })
+  teachers: GroupSubjectTeacherDto[];
+}

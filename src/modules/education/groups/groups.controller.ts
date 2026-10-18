@@ -1,7 +1,7 @@
 import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GroupsService } from './groups.service';
-import { GroupResponseDto } from './dto/group.dto';
+import { GroupResponseDto, GroupSubjectResponseDto } from './dto/group.dto';
 import { ApiSuccessResponse } from '@common';
 
 /**
@@ -19,6 +19,17 @@ export class GroupsController {
   @ApiSuccessResponse(GroupResponseDto)
   findAll() {
     return this.groupsService.findAll();
+  }
+
+  @Get(':groupId/subjects')
+  @ApiOperation({
+    summary: 'Предметы группы',
+    description:
+      'Предметы из расписания группы с преподавателями этой группы, по алфавиту. Расписания нет — пустой список',
+  })
+  @ApiSuccessResponse(GroupSubjectResponseDto)
+  findSubjects(@Param('groupId', ParseUUIDPipe) groupId: string) {
+    return this.groupsService.findSubjects(groupId);
   }
 
   @Get(':id')

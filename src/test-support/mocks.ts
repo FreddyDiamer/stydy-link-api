@@ -34,6 +34,8 @@ export interface DatabaseMock {
   subject: MockedModel;
   teacher: MockedModel;
   teacherSubject: MockedModel;
+  groupSubject: MockedModel;
+  groupSubjectTeacher: MockedModel;
   $transaction: jest.Mock;
 }
 
@@ -50,6 +52,8 @@ export const createDatabaseMock = (): DatabaseMock => {
     subject: model(),
     teacher: model(),
     teacherSubject: model(),
+    groupSubject: model(),
+    groupSubjectTeacher: model(),
     // транзакция в тестах прозрачна: и колбэк, и массив промисов
     $transaction: jest.fn((arg: unknown) =>
       typeof arg === 'function'

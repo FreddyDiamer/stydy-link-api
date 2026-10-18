@@ -51,21 +51,20 @@ export class ServicesService extends BaseService {
         throw new NotFoundException('Teacher', createServiceDto.teacherId);
       }
 
-      // TODO вернуть проверку
-      // Проверяем, что существует активная связь между преподавателем и предметом
-      // const teacherSubject = await this.db.teacherSubject.findFirst({
-      //   where: {
-      //     teacherId: createServiceDto.teacherId,
-      //     subjectId: createServiceDto.subjectId,
-      //     isActive: true,
-      //   },
-      // });
+      // Пара «преподаватель ведёт предмет» — как и при обновлении
+      const teacherSubject = await this.db.teacherSubject.findFirst({
+        where: {
+          teacherId: createServiceDto.teacherId,
+          subjectId: createServiceDto.subjectId,
+          isActive: true,
+        },
+      });
 
-      // if (!teacherSubject) {
-      //   throw new BusinessException(
-      //     `Преподаватель "${teacher.fullName}" не ведет предмет "${subject.name}" или связь неактивна`,
-      //   );
-      // }
+      if (!teacherSubject) {
+        throw new BusinessException(
+          `Преподаватель "${teacher.fullName}" не ведет предмет "${subject.name}" или связь неактивна`,
+        );
+      }
 
       // Создаем услугу
       const service = await this.db.service.create({

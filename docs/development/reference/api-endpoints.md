@@ -49,41 +49,44 @@ Admin-style endpoints (create/update/delete arbitrary users, verify/activate) we
 
 Write endpoints (POST/PATCH/DELETE) were removed from all education controllers: reference data is populated by the parser, and without a role system any user could rewrite the university catalog.
 
+List endpoints return light items — subjects `{ id, name, isActive }`, teachers `{ id, fullName }`; nested teachers/subjects and counters come only from `/:id`. Names are sorted the Russian way in the app. `search` is case-insensitive and trimmed; prefix matches come before substring matches, alphabetical within each part.
+
 ### `/education/subjects`
 
-| Method | Path                            | Description                      |
-| ------ | ------------------------------- | -------------------------------- |
-| GET    | `/education/subjects`           | List (pagination + filter)       |
-| GET    | `/education/subjects/active`    | Active subjects (form selectors) |
-| GET    | `/education/subjects/:id`       | Subject by ID (teachers + stats) |
-| GET    | `/education/subjects/:id/stats` | Usage statistics                 |
+| Method | Path                            | Description                                                      |
+| ------ | ------------------------------- | ---------------------------------------------------------------- |
+| GET    | `/education/subjects`           | List (pagination, `search`; active only unless `isActive=false`) |
+| GET    | `/education/subjects/active`    | All active subjects, `{ items, total }`                          |
+| GET    | `/education/subjects/:id`       | Subject by ID (teachers + stats)                                 |
+| GET    | `/education/subjects/:id/stats` | Usage statistics                                                 |
 
 ### `/education/teachers`
 
-| Method | Path                                        | Description                      |
-| ------ | ------------------------------------------- | -------------------------------- |
-| GET    | `/education/teachers`                       | List (pagination + filter)       |
-| GET    | `/education/teachers/active`                | Teachers with active subjects    |
-| GET    | `/education/teachers/by-subject/:subjectId` | Teachers teaching a subject      |
-| GET    | `/education/teachers/:id`                   | Teacher by ID (subjects + stats) |
-| GET    | `/education/teachers/:id/stats`             | Activity statistics              |
+| Method | Path                                        | Description                                                   |
+| ------ | ------------------------------------------- | ------------------------------------------------------------- |
+| GET    | `/education/teachers`                       | List (pagination, `search`)                                   |
+| GET    | `/education/teachers/active`                | Teachers with active subjects, `{ items, total }`             |
+| GET    | `/education/teachers/by-subject/:subjectId` | All teachers of a subject (no pagination), `{ items, total }` |
+| GET    | `/education/teachers/:id`                   | Teacher by ID (subjects + stats)                              |
+| GET    | `/education/teachers/:id/stats`             | Activity statistics                                           |
 
 ### `/education/teacher-subjects`
 
-| Method | Path                                                      | Description                  |
-| ------ | --------------------------------------------------------- | ---------------------------- |
-| GET    | `/education/teacher-subjects`                             | List (pagination + filter)   |
-| GET    | `/education/teacher-subjects/teacher/:teacherId`          | Active subjects of a teacher |
-| GET    | `/education/teacher-subjects/subject/:subjectId`          | Active teachers of a subject |
-| GET    | `/education/teacher-subjects/stats/:teacherId/:subjectId` | Link stats                   |
-| GET    | `/education/teacher-subjects/:id`                         | Link by ID                   |
+| Method | Path                                                      | Description                                                                           |
+| ------ | --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| GET    | `/education/teacher-subjects`                             | List (pagination + filter)                                                            |
+| GET    | `/education/teacher-subjects/teacher/:teacherId`          | All active subjects of a teacher: `{ items: { id, subject: { id, name } }[], total }` |
+| GET    | `/education/teacher-subjects/subject/:subjectId`          | Active teachers of a subject                                                          |
+| GET    | `/education/teacher-subjects/stats/:teacherId/:subjectId` | Link stats                                                                            |
+| GET    | `/education/teacher-subjects/:id`                         | Link by ID                                                                            |
 
 ### `/education/groups`
 
-| Method | Path                    | Description     |
-| ------ | ----------------------- | --------------- |
-| GET    | `/education/groups`     | List all groups |
-| GET    | `/education/groups/:id` | Group by ID     |
+| Method | Path                                  | Description                                                                                                                                                  |
+| ------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/education/groups`                   | List all groups                                                                                                                                              |
+| GET    | `/education/groups/:groupId/subjects` | The group's scheduled subjects with that group's teachers: `{ id, name, teachers: { id, fullName }[] }[]`; `[]` without a schedule, 404 for an unknown group |
+| GET    | `/education/groups/:id`               | Group by ID                                                                                                                                                  |
 
 ## Marketplace — `/marketplace/services`
 

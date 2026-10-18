@@ -12,6 +12,15 @@ import {
   NotFoundException,
   PaginationDto,
 } from '@common';
+import { searchByName, sortByName } from '../education-sort';
+
+/** Элемент списка преподавателей: вложенные предметы и счётчики — только в /:id */
+export type TeacherListItem = Pick<Teacher, 'id' | 'fullName'>;
+
+const TEACHER_LIST_SELECT = {
+  id: true,
+  fullName: true,
+} satisfies Prisma.TeacherSelect;
 
 @Injectable()
 export class TeachersService extends BaseService {
@@ -50,50 +59,20 @@ export class TeachersService extends BaseService {
   async findAll(
     paginationDto: PaginationDto,
     filterDto: TeacherFilterDto,
-  ): Promise<Teacher[]> {
+  ): Promise<TeacherListItem[]> {
     try {
-      const where: Prisma.TeacherWhereInput = {};
-
-      // Поиск по имени
-      if (filterDto.search?.trim()) {
-        where.fullName = {
-          contains: filterDto.search.trim(),
-          mode: 'insensitive',
-        };
-      }
-
       // TODO: Поиск по внешнему ID после обновления Prisma client
 
+      // Поиск, ранжирование и страница — в приложении (см. education-sort):
+      // «начинается с запроса» выше «содержит», и не зависит от локали базы
       const teachers = await this.db.teacher.findMany({
-        where,
-        skip: paginationDto.skip,
-        take: paginationDto.limit,
-        orderBy: { fullName: 'asc' },
-        include: {
-          teacherSubjects: {
-            where: { isActive: true },
-            include: {
-              subject: {
-                select: {
-                  id: true,
-                  name: true,
-                  isActive: true,
-                },
-              },
-            },
-            orderBy: { subject: { name: 'asc' } },
-          },
-          _count: {
-            select: {
-              services: { where: { status: 'ACTIVE' } },
-              requests: true,
-              deals: true,
-            },
-          },
-        },
+        select: TEACHER_LIST_SELECT,
       });
 
-      return teachers;
+      return searchByName(teachers, (t) => t.fullName, filterDto.search).slice(
+        paginationDto.skip,
+        paginationDto.skip + paginationDto.limit,
+      );
     } catch (error) {
       this.logError('Ошибка получения списка преподавателей', error as Error, {
         pagination: paginationDto,
@@ -143,35 +122,16 @@ export class TeachersService extends BaseService {
     return this.db.teacher.findUnique({ where: { foreignId } });
   }
 
-  async findActiveTeachers(): Promise<Teacher[]> {
-    return this.db.teacher.findMany({
+  async findActiveTeachers(): Promise<TeacherListItem[]> {
+    const teachers = await this.db.teacher.findMany({
       where: {
         teacherSubjects: {
           some: { isActive: true },
         },
       },
-      orderBy: { fullName: 'asc' },
-      include: {
-        teacherSubjects: {
-          where: { isActive: true },
-          include: {
-            subject: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-          orderBy: { subject: { name: 'asc' } },
-        },
-        _count: {
-          select: {
-            services: { where: { status: 'ACTIVE' } },
-            teacherSubjects: { where: { isActive: true } },
-          },
-        },
-      },
+      select: TEACHER_LIST_SELECT,
     });
+    return sortByName(teachers, (t) => t.fullName);
   }
 
   async update(
@@ -310,8 +270,9 @@ export class TeachersService extends BaseService {
     };
   }
 
-  async getTeachersBySubject(subjectId: string): Promise<Teacher[]> {
-    return this.db.teacher.findMany({
+  /** Все преподаватели предмета, без пагинации: фронту нужен полный список */
+  async getTeachersBySubject(subjectId: string): Promise<TeacherListItem[]> {
+    const teachers = await this.db.teacher.findMany({
       where: {
         teacherSubjects: {
           some: {
@@ -320,15 +281,8 @@ export class TeachersService extends BaseService {
           },
         },
       },
-      orderBy: { fullName: 'asc' },
-      include: {
-        _count: {
-          select: {
-            services: { where: { subjectId, status: 'ACTIVE' } },
-            requests: { where: { subjectId } },
-          },
-        },
-      },
+      select: TEACHER_LIST_SELECT,
     });
+    return sortByName(teachers, (t) => t.fullName);
   }
 }

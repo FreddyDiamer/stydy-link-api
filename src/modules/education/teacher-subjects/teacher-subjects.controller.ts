@@ -4,6 +4,7 @@ import { TeacherSubjectsService } from './teacher-subjects.service';
 import {
   TeacherSubjectResponseDto,
   TeacherSubjectFilterDto,
+  TeacherSubjectOfTeacherDto,
 } from './dto/teacher-subject.dto';
 import { ApiSuccessResponse } from '@common';
 
@@ -33,9 +34,10 @@ export class TeacherSubjectsController {
   @Get('teacher/:teacherId')
   @ApiOperation({
     summary: 'Получить предметы преподавателя',
-    description: 'Получить активные предметы, которые ведет преподаватель',
+    description:
+      'Все активные предметы преподавателя { id, subject: { id, name } } по названию предмета, без пагинации, в обёртке { items, total }',
   })
-  @ApiSuccessResponse(TeacherSubjectResponseDto)
+  @ApiSuccessResponse(TeacherSubjectOfTeacherDto)
   async findByTeacher(@Param('teacherId', ParseUUIDPipe) teacherId: string) {
     const subjects =
       await this.teacherSubjectsService.findActiveByTeacher(teacherId);

@@ -95,3 +95,15 @@ export class SubjectResponseDto {
     deals: number;
   };
 }
+
+/** Элемент списка предметов: без вложенных преподавателей и счётчиков */
+export class SubjectListItemDto {
+  @ApiProperty({ example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' })
+  id: string;
+
+  @ApiProperty({ example: 'Математика' })
+  name: string;
+
+  @ApiProperty({ example: true })
+  isActive: boolean;
+}

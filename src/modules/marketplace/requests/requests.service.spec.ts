@@ -64,6 +64,7 @@ describe('RequestsService', () => {
       id: 'teacher-1',
       fullName: 'Иванов И.И.',
     });
+    db.teacherSubject.findFirst.mockResolvedValue({ id: 'ts-1' });
     db.request.create.mockResolvedValue(requestRow());
     db.request.findUnique.mockResolvedValue(requestRow());
     db.request.update.mockResolvedValue(requestRow());
@@ -111,6 +112,22 @@ describe('RequestsService', () => {
         code: 'NOT_FOUND',
         status: 404,
       });
+    });
+
+    it('требует, чтобы преподаватель вёл предмет (активная связь)', async () => {
+      db.teacherSubject.findFirst.mockResolvedValue(null);
+
+      await expectBusinessError(() => service.create(createDto()), {
+        status: 400,
+      });
+      expect(db.teacherSubject.findFirst).toHaveBeenCalledWith({
+        where: {
+          teacherId: 'teacher-1',
+          subjectId: 'subject-1',
+          isActive: true,
+        },
+      });
+      expect(db.request.create).not.toHaveBeenCalled();
     });
   });
 

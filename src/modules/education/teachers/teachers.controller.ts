@@ -1,7 +1,11 @@
 import { Controller, Get, Param, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TeachersService } from './teachers.service';
-import { TeacherResponseDto, TeacherFilterDto } from './dto/teacher.dto';
+import {
+  TeacherResponseDto,
+  TeacherFilterDto,
+  TeacherListItemDto,
+} from './dto/teacher.dto';
 import { ApiSuccessResponse } from '@common';
 
 /**
@@ -18,9 +22,9 @@ export class TeachersController {
   @ApiOperation({
     summary: 'Получить список преподавателей',
     description:
-      'Получить список преподавателей университета с фильтрацией и пагинацией',
+      'Лёгкий список { id, fullName } с пагинацией. search: без учёта регистра; сначала ФИО, начинающиеся с запроса, затем содержащие его, внутри — по алфавиту',
   })
-  @ApiSuccessResponse(TeacherResponseDto)
+  @ApiSuccessResponse(TeacherListItemDto)
   async findAll(@Query() query: TeacherFilterDto) {
     return this.teachersService.findAll(query, query);
   }
@@ -29,9 +33,9 @@ export class TeachersController {
   @ApiOperation({
     summary: 'Получить активных преподавателей',
     description:
-      'Получить список преподавателей, которые ведут активные предметы',
+      'Все преподаватели с активными предметами { id, fullName } по алфавиту, в обёртке { items, total }',
   })
-  @ApiSuccessResponse(TeacherResponseDto)
+  @ApiSuccessResponse(TeacherListItemDto)
   async findActive() {
     const teachers = await this.teachersService.findActiveTeachers();
     return {
@@ -43,9 +47,10 @@ export class TeachersController {
   @Get('by-subject/:subjectId')
   @ApiOperation({
     summary: 'Получить преподавателей по предмету',
-    description: 'Получить список преподавателей, ведущих определенный предмет',
+    description:
+      'Все преподаватели предмета { id, fullName } по алфавиту, без пагинации, в обёртке { items, total }',
   })
-  @ApiSuccessResponse(TeacherResponseDto)
+  @ApiSuccessResponse(TeacherListItemDto)
   async findBySubject(@Param('subjectId', ParseUUIDPipe) subjectId: string) {
     const teachers = await this.teachersService.getTeachersBySubject(subjectId);
     return {

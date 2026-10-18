@@ -12,6 +12,16 @@ import {
   NotFoundException,
   PaginationDto,
 } from '@common';
+import { searchByName, sortByName } from '../education-sort';
+
+/** Элемент списка предметов: вложенные преподаватели и счётчики — только в /:id */
+export type SubjectListItem = Pick<Subject, 'id' | 'name' | 'isActive'>;
+
+const SUBJECT_LIST_SELECT = {
+  id: true,
+  name: true,
+  isActive: true,
+} satisfies Prisma.SubjectSelect;
 
 @Injectable()
 export class SubjectsService extends BaseService {
@@ -66,47 +76,24 @@ export class SubjectsService extends BaseService {
   async findAll(
     paginationDto: PaginationDto,
     filterDto: SubjectFilterDto,
-  ): Promise<Subject[]> {
+  ): Promise<SubjectListItem[]> {
     try {
-      const where: Prisma.SubjectWhereInput = {};
+      // по умолчанию — только активные; явный isActive=false отдаёт неактивные
+      const where: Prisma.SubjectWhereInput = {
+        isActive: filterDto.isActive ?? true,
+      };
 
-      // Поиск по названию
-      if (filterDto.search?.trim()) {
-        where.name = {
-          contains: filterDto.search.trim(),
-          mode: 'insensitive',
-        };
-      }
-
+      // Поиск, ранжирование и страница — в приложении (см. education-sort):
+      // «начинается с запроса» выше «содержит», и не зависит от локали базы
       const subjects = await this.db.subject.findMany({
         where,
-        skip: paginationDto.skip,
-        take: paginationDto.limit,
-        orderBy: { name: 'asc' },
-        include: {
-          teacherSubjects: {
-            where: { isActive: true },
-            include: {
-              teacher: {
-                select: {
-                  id: true,
-                  fullName: true,
-                },
-              },
-            },
-            orderBy: { teacher: { fullName: 'asc' } },
-          },
-          _count: {
-            select: {
-              services: { where: { status: 'ACTIVE' } },
-              requests: true,
-              deals: true,
-            },
-          },
-        },
+        select: SUBJECT_LIST_SELECT,
       });
 
-      return subjects;
+      return searchByName(subjects, (s) => s.name, filterDto.search).slice(
+        paginationDto.skip,
+        paginationDto.skip + paginationDto.limit,
+      );
     } catch (error) {
       this.logError('Ошибка получения списка предметов', error as Error, {
         pagination: paginationDto,
@@ -162,31 +149,12 @@ export class SubjectsService extends BaseService {
     });
   }
 
-  async findActive(): Promise<Subject[]> {
-    return this.db.subject.findMany({
+  async findActive(): Promise<SubjectListItem[]> {
+    const subjects = await this.db.subject.findMany({
       where: { isActive: true },
-      orderBy: { name: 'asc' },
-      include: {
-        teacherSubjects: {
-          where: { isActive: true },
-          include: {
-            teacher: {
-              select: {
-                id: true,
-                fullName: true,
-              },
-            },
-          },
-          orderBy: { teacher: { fullName: 'asc' } },
-        },
-        _count: {
-          select: {
-            services: { where: { status: 'ACTIVE' } },
-            teacherSubjects: { where: { isActive: true } },
-          },
-        },
-      },
+      select: SUBJECT_LIST_SELECT,
     });
+    return sortByName(subjects, (s) => s.name);
   }
 
   async update(
