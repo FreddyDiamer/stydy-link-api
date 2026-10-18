@@ -12,3 +12,5 @@ process.env.JWT_SECRET =
 process.env.JWT_EXPIRES_IN = '1h';
 // токена бота нет — уведомления в тестах никуда не уходят
 delete process.env.TELEGRAM_BOT_TOKEN;
+// секрет вебхука — чтобы проверить приём апдейтов; без токена бота вебхук не регистрируется
+process.env.TELEGRAM_WEBHOOK_SECRET = 'e2e-webhook-secret-0123456789';

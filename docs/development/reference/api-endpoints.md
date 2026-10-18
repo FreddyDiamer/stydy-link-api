@@ -178,6 +178,14 @@ Generic `PATCH`/`DELETE /deals/:id` were removed (they let anyone rewrite any de
 | PATCH  | `/reviews/:id/reply`            | Tutor replies to a review                                                                                                    |
 | DELETE | `/reviews/:id`                  | Delete (author only)                                                                                                         |
 
+## Telegram — `/telegram` (`src/modules/notifications/telegram-webhook.controller.ts`)
+
+Public (no JWT) and not rate-limited, but every request must carry the webhook secret in `X-Telegram-Bot-Api-Secret-Token`, otherwise 401.
+
+| Method  | Path                | Description                                                        |
+| ------- | ------------------- | ------------------------------------------------------------------ |
+| 🔓 POST | `/telegram/webhook` | Telegram bot updates: `/start` greeting, hint on any other message |
+
 ## Parser — `/parser`
 
 Admins only: the caller's `telegramId` must be listed in `ADMIN_TELEGRAM_IDS` (`AdminGuard`), everyone else gets 403 — with the variable empty nobody can run the parser. Only one sync runs at a time — a second call while one is in progress returns `409 PARSER_BUSY`.

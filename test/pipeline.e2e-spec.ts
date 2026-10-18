@@ -144,4 +144,36 @@ describe('Конвейер запросов (e2e)', () => {
         .expect(403);
     });
   });
+
+  describe('вебхук Telegram', () => {
+    const update = {
+      update_id: 1,
+      message: {
+        message_id: 1,
+        date: 0,
+        chat: { id: 42, type: 'private' },
+        text: '/start',
+      },
+    };
+
+    it('без секрета или с чужим секретом — 401, хоть эндпоинт и без JWT', async () => {
+      await request(server)
+        .post('/api/telegram/webhook')
+        .send(update)
+        .expect(401);
+      await request(server)
+        .post('/api/telegram/webhook')
+        .set('X-Telegram-Bot-Api-Secret-Token', 'not-the-secret-0123456789')
+        .send(update)
+        .expect(401);
+    });
+
+    it('с верным секретом принимает апдейт как есть — whitelist его не режет', async () => {
+      await request(server)
+        .post('/api/telegram/webhook')
+        .set('X-Telegram-Bot-Api-Secret-Token', 'e2e-webhook-secret-0123456789')
+        .send(update)
+        .expect(200);
+    });
+  });
 });

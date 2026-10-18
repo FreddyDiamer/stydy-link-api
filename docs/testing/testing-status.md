@@ -2,7 +2,7 @@
 
 What the suite covers today, and the conventions it follows.
 
-## Unit tests (177, no database needed)
+## Unit tests (185, no database needed)
 
 `pnpm test` — every suite mocks the Prisma layer, so it runs anywhere.
 
@@ -14,6 +14,7 @@ What the suite covers today, and the conventions it follows.
 | `common/filters/global-exception.filter.spec.ts` | Prisma `P2002` → 409, `P2025` → 404, other Prisma errors stay 500, business errors keep code and status                                                                                                                                                              |
 | `parser/parser.controller.spec.ts`               | `AdminGuard` is applied to the whole parser controller                                                                                                                                                                                                               |
 | `parser/workers/utils/subject-name.spec.ts`      | Subject names from kai.ru are trimmed and inner whitespace collapsed                                                                                                                                                                                                 |
+| `notifications/telegram-bot.service.spec.ts`     | Buttons go out as `web_app`; `/start` greets by (HTML-escaped) name with an open-app button; other messages get a hint; webhook secret check; webhook registered on the app domain only when the secret is set                                                       |
 | `parser/workers/utils/kai-api-client.spec.ts`    | Teacher lookup hits the staff schedule page; a 404 from kai.ru is an error, not an empty list; schedule days are flattened                                                                                                                                           |
 | `auth/auth.service.spec.ts`                      | `initData` signature, 24h `auth_date` window, fail-closed without a bot token, dev-login only in `development`, dev-login by username                                                                                                                                |
 | `marketplace/deals/deals.service.spec.ts`        | Participant-only access, `role` filter, two-sided confirmation, auto-confirm sweep (never before the deal's deadline, notifies both sides), reopen, cancellation record                                                                                              |
@@ -33,13 +34,14 @@ Shared mocks live in **`src/test-support/mocks.ts`** — that directory is exclu
 
 Jest maps the `@common` / `@config` / `@database` / `@modules` aliases via `moduleNameMapper` in `package.json`.
 
-## E2E (17 tests, real Postgres)
+## E2E (19 tests, real Postgres)
 
 `pnpm run test:e2e` boots the whole app through `AppModule` with the same pipeline as `main.ts` (global `/api` prefix, `ValidationPipe` with whitelist + forbidNonWhitelisted, `GlobalExceptionFilter`) and drives it over HTTP with supertest against a real database.
 
 - `test/marketplace.e2e-spec.ts` — both loops end to end: request → response → accept → deal → both sides confirm → one review from each; and service → booking (no price) → tutor accepts → deal at the service price → both confirm → reviews, with the deal visible to both sides in `GET /marketplace/deals`. Also that a closed request drops out of the feed but stays with its author, that a second review from the same author is refused by the schema's composite unique key, and that ownership checks (accept a booking, suspend or edit a service) answer 403, not 500.
 - `test/marketplace.e2e-spec.ts` also pins response visibility: an outsider gets empty lists and 403 on a foreign response (`:id`, `:id/stats`), each side sees its responses through `role`, and an unknown `role` is a 400.
 - `test/pipeline.e2e-spec.ts` — the parts unit tests cannot see: the global guard (401 without a token, 401 for a token whose user was deleted), the success envelope the frontend's `apiClient` unwraps, `forbidNonWhitelisted` rejecting extra fields (this is what keeps the frontend from sending `authorId` to `/reviews` again), `ParseUUIDPipe`, and error mapping to 403/404 with a body.
+- `test/pipeline.e2e-spec.ts` also covers the Telegram webhook: public but 401 without or with a wrong secret, and a raw Telegram update passes the strict `ValidationPipe` with the right one.
 
 **Setup.** E2E needs its own database — the suite truncates every table before each test, so never point it at a working database.
 

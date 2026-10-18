@@ -7,6 +7,11 @@ const appConfigSchema = z.object({
   telegramBotToken: z.string().optional(),
   frontendBaseUrl: z.string().url().optional(),
   adminTelegramIds: z.array(z.string()).default([]),
+  // Ограничения Telegram для secret_token: 1–256 символов A-Z a-z 0-9 _ -
+  telegramWebhookSecret: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{16,256}$/)
+    .optional(),
 });
 
 export const appConfig = registerAs('app', () => {
@@ -20,6 +25,7 @@ export const appConfig = registerAs('app', () => {
       .split(',')
       .map((id) => id.trim())
       .filter(Boolean),
+    telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || undefined,
   };
 
   const validatedConfig = appConfigSchema.parse(config);
