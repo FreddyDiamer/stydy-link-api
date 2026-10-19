@@ -44,7 +44,7 @@ export class GroupsService extends BaseService {
         throw error;
       }
       this.logError('Failed to create group', error as Error, createGroupDto);
-      throw new BusinessException('Failed to create group');
+      throw error;
     }
   }
 
@@ -57,7 +57,7 @@ export class GroupsService extends BaseService {
       return groups;
     } catch (error) {
       this.logError('Failed to fetch groups', error as Error);
-      throw new BusinessException('Failed to fetch groups');
+      throw error;
     }
   }
 
@@ -148,7 +148,7 @@ export class GroupsService extends BaseService {
         throw error;
       }
       this.logError('Failed to delete group', error as Error, { id });
-      throw new BusinessException('Failed to delete group');
+      throw error;
     }
   }
 }

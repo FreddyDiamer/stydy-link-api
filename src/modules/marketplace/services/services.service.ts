@@ -120,7 +120,7 @@ export class ServicesService extends BaseService {
         throw error;
       }
       this.logError('Ошибка создания услуги', error as Error, createServiceDto);
-      throw new BusinessException('Не удалось создать услугу');
+      throw error;
     }
   }
 
@@ -287,7 +287,7 @@ export class ServicesService extends BaseService {
       this.logError('Ошибка получения списка услуг', error as Error, {
         query: queryDto,
       });
-      throw new BusinessException('Не удалось получить список услуг');
+      throw error;
     }
   }
 
@@ -513,7 +513,7 @@ export class ServicesService extends BaseService {
         id,
         ...updateServiceDto,
       });
-      throw new BusinessException('Не удалось обновить услугу');
+      throw error;
     }
   }
 
@@ -573,7 +573,7 @@ export class ServicesService extends BaseService {
         throw error;
       }
       this.logError('Ошибка удаления услуги', error as Error, { id });
-      throw new BusinessException('Не удалось удалить услугу');
+      throw error;
     }
   }
 

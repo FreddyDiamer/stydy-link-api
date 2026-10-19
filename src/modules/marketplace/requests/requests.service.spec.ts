@@ -193,6 +193,72 @@ describe('RequestsService', () => {
     });
   });
 
+  describe('срок заявки', () => {
+    const daysFromNow = (days: number) =>
+      new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+    it('прошедший срок при создании — 400 с понятным текстом, заявка не создаётся', async () => {
+      await expectBusinessError(
+        () => service.create(createDto({ deadline: daysFromNow(-2) })),
+        { status: 400 },
+      );
+      await expect(
+        service.create(createDto({ deadline: daysFromNow(-2) })),
+      ).rejects.toThrow(
+        'Срок уже прошёл — выберите сегодняшнюю или будущую дату',
+      );
+      expect(db.request.create).not.toHaveBeenCalled();
+    });
+
+    it('будущий срок уходит в Prisma как Date', async () => {
+      const deadline = daysFromNow(3);
+
+      await service.create(createDto({ deadline }));
+
+      const data = db.request.create.mock.calls[0][0].data;
+      expect(data.deadline).toBe(deadline);
+    });
+
+    it('при правке прошедший срок не мешает, если его не меняют', async () => {
+      const past = daysFromNow(-10);
+      db.request.findUnique.mockResolvedValue(requestRow({ deadline: past }));
+
+      await service.update('request-1', {
+        description: 'Уточнил задачу',
+        deadline: new Date(past),
+      } as never);
+
+      expect(db.request.update).toHaveBeenCalled();
+    });
+
+    it('при правке новый прошедший срок — 400', async () => {
+      await expectBusinessError(
+        () =>
+          service.update('request-1', { deadline: daysFromNow(-1) } as never),
+        { status: 400 },
+      );
+      expect(db.request.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('неожиданные ошибки', () => {
+    it('сбой базы при создании пробрасывается как есть — фильтр ответит 500, а не 400', async () => {
+      const failure = new Error('connection lost');
+      db.request.create.mockRejectedValue(failure);
+
+      await expect(service.create(createDto())).rejects.toBe(failure);
+    });
+
+    it('сбой базы при правке тоже не превращается в 400', async () => {
+      const failure = new Error('connection lost');
+      db.request.update.mockRejectedValue(failure);
+
+      await expect(
+        service.update('request-1', { description: 'Новое' } as never),
+      ).rejects.toBe(failure);
+    });
+  });
+
   describe('редактирование заявки', () => {
     it('меняет описание и бюджет', async () => {
       await service.update('request-1', {

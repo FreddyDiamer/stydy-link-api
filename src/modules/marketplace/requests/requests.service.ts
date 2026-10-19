@@ -11,6 +11,8 @@ import {
   BusinessException,
   ForbiddenException,
   NotFoundException,
+  assertDeadlineNotPast,
+  assertChangedDeadlineNotPast,
 } from '@common';
 import { NotificationService } from '../../notifications/notification.service';
 
@@ -66,6 +68,8 @@ export class RequestsService extends BaseService {
           `Преподаватель "${teacher.fullName}" не ведет предмет "${subject.name}" или связь неактивна`,
         );
       }
+
+      assertDeadlineNotPast(createRequestDto.deadline);
 
       // Создаем заявку
       const request = await this.db.request.create({
@@ -132,7 +136,7 @@ export class RequestsService extends BaseService {
         throw error;
       }
       this.logError('Ошибка создания заявки', error as Error, createRequestDto);
-      throw new BusinessException('Не удалось создать заявку');
+      throw error;
     }
   }
 
@@ -243,7 +247,7 @@ export class RequestsService extends BaseService {
       this.logError('Ошибка получения списка заявок', error as Error, {
         filter: filterDto,
       });
-      throw new BusinessException('Не удалось получить список заявок');
+      throw error;
     }
   }
 
@@ -403,6 +407,12 @@ export class RequestsService extends BaseService {
       // Проверяем существование заявки
       const existingRequest = await this.findOne(id);
 
+      // Срок проверяем, только если его меняют
+      assertChangedDeadlineNotPast(
+        updateRequestDto.deadline,
+        existingRequest.deadline,
+      );
+
       // Если изменяется предмет или преподаватель, проверяем связь
       if (updateRequestDto.subjectId || updateRequestDto.teacherId) {
         const newSubjectId =
@@ -500,7 +510,7 @@ export class RequestsService extends BaseService {
         id,
         ...updateRequestDto,
       });
-      throw new BusinessException('Не удалось обновить заявку');
+      throw error;
     }
   }
 
@@ -595,7 +605,7 @@ export class RequestsService extends BaseService {
         throw error;
       }
       this.logError('Ошибка удаления заявки', error as Error, { id });
-      throw new BusinessException('Не удалось удалить заявку');
+      throw error;
     }
   }
 

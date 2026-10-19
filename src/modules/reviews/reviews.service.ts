@@ -144,7 +144,7 @@ export class ReviewsService extends BaseService {
         throw error;
       }
       this.logError('Ошибка создания отзыва', error as Error, createReviewDto);
-      throw new BusinessException('Не удалось создать отзыв');
+      throw error;
     }
   }
 
@@ -235,7 +235,7 @@ export class ReviewsService extends BaseService {
         pagination: paginationDto,
         filter: filterDto,
       });
-      throw new BusinessException('Не удалось получить список отзывов');
+      throw error;
     }
   }
 
@@ -418,7 +418,7 @@ export class ReviewsService extends BaseService {
         id,
         ...updateReviewDto,
       });
-      throw new BusinessException('Не удалось обновить отзыв');
+      throw error;
     }
   }
 
@@ -436,7 +436,7 @@ export class ReviewsService extends BaseService {
         throw error;
       }
       this.logError('Ошибка удаления отзыва', error as Error, { id });
-      throw new BusinessException('Не удалось удалить отзыв');
+      throw error;
     }
   }
 

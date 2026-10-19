@@ -1,9 +1,9 @@
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import { type INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { AppModule } from '../../src/app.module';
 import { DatabaseService } from '../../src/database/database.service';
-import { GlobalExceptionFilter } from '../../src/common';
+import { GlobalExceptionFilter, createValidationPipe } from '../../src/common';
 
 export interface TestApp {
   app: INestApplication;
@@ -25,13 +25,7 @@ export const createTestApp = async (): Promise<TestApp> => {
 
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');
-  app.useGlobalPipes(
-    new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-    }),
-  );
+  app.useGlobalPipes(createValidationPipe());
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   await app.init();

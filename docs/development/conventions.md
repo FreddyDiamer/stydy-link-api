@@ -15,6 +15,18 @@ throw new ForbiddenException('Только автор услуги может п
 
 Available: `BusinessException` (400), `NotFoundException` (404), `ValidationException` (422), `UnauthorizedException` (401), `ForbiddenException` (403). `GlobalExceptionFilter` turns them into the standard error shape.
 
+**Never wrap unexpected errors into a 400.** A `catch` may log context, but it rethrows what it caught: `BusinessException`/`NotFoundException` keep their status, anything else reaches the filter and becomes a 500 with a `requestId`. Turning a failed Prisma call into `BusinessException('Не удалось …')` hides a server bug behind a client error and loses the cause:
+
+```typescript
+} catch (error) {
+  if (error instanceof BusinessException || error instanceof NotFoundException) {
+    throw error;
+  }
+  this.logError('Ошибка создания заявки', error as Error, dto);
+  throw error; // not: throw new BusinessException('Не удалось создать заявку')
+}
+```
+
 ## Services
 
 - Services extend `BaseService` (`src/common/services/base.service.ts`) to get `this.logger`, `logInfo/logError/logWarn/logSuccess`, `retry()` and `sleep()`
@@ -28,6 +40,9 @@ Available: `BusinessException` (400), `NotFoundException` (404), `ValidationExce
 - List endpoints take `PaginationDto` from `@common` (`page`, `limit` ≤ 100, computed `skip`) and return `PaginatedResult<T>`
 - A list endpoint takes **one** `@Query()` object: the filter DTO extends `PaginationDto` (see `UserFilterDto`, `DealListQueryDto`). Two `@Query()` DTOs on one method fail `forbidNonWhitelisted` — each is validated against the whole query string
 - UUID path params are validated with `ParseUUIDPipe`
+- Dates from the client use `@IsClientDate()` from `@common` and are typed `Date` — never bare `@IsDateString()`, which lets `"2026-10-14"` through as a string that Prisma then rejects. `@IsClientDate()` accepts `YYYY-MM-DD` (end of that day, Moscow time) and full ISO-8601
+- Deadlines may not lie before the start of today in Moscow: call `assertDeadlineNotPast` on create and `assertChangedDeadlineNotPast` on update (checks only a changed value) from `@common`
+- Validation messages are Russian: a new DTO field gets a label in `FIELD_LABELS` (`src/common/pipes/validation.pipe.ts`), otherwise users see `Поле «fieldName»`
 
 ## Money
 

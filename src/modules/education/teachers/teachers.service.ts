@@ -52,7 +52,7 @@ export class TeachersService extends BaseService {
         error as Error,
         createTeacherDto,
       );
-      throw new BusinessException('Не удалось создать преподавателя');
+      throw error;
     }
   }
 
@@ -78,7 +78,7 @@ export class TeachersService extends BaseService {
         pagination: paginationDto,
         filter: filterDto,
       });
-      throw new BusinessException('Не удалось получить список преподавателей');
+      throw error;
     }
   }
 
@@ -169,7 +169,7 @@ export class TeachersService extends BaseService {
         id,
         ...updateTeacherDto,
       });
-      throw new BusinessException('Не удалось обновить преподавателя');
+      throw error;
     }
   }
 
@@ -222,7 +222,7 @@ export class TeachersService extends BaseService {
         throw error;
       }
       this.logError('Ошибка удаления преподавателя', error as Error, { id });
-      throw new BusinessException('Не удалось удалить преподавателя');
+      throw error;
     }
   }
 

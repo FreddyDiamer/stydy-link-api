@@ -5,13 +5,12 @@ import {
   IsNumber,
   IsUUID,
   IsEnum,
-  IsDateString,
   Min,
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { PaginationDto } from '@common';
+import { IsClientDate, PaginationDto } from '@common';
 // Вместо enum ResponseStatus используем string union type
 export type ResponseStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 
@@ -54,12 +53,15 @@ export class CreateServiceResponseDto {
   price?: number;
 
   @ApiPropertyOptional({
-    description: 'Предложенная дата выполнения',
-    example: '2024-06-01T10:00:00.000Z',
+    description:
+      'Предложенная дата выполнения. ГГГГ-ММ-ДД принимается как конец этого дня по Москве; не раньше сегодняшнего дня',
+    example: '2026-11-01T20:59:59.999Z',
+    type: String,
+    format: 'date-time',
   })
   @IsOptional()
-  @IsDateString()
-  proposedDeadline?: string;
+  @IsClientDate()
+  proposedDeadline?: Date;
 
   @ApiPropertyOptional({
     description:

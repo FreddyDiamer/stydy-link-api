@@ -29,88 +29,80 @@ export class AuthService {
   ) {}
 
   async loginOrRegister(authDto: TelegramAuthDto): Promise<AuthResponseDto> {
-    try {
-      // Валидируем initData строку
-      const botToken = this.configService.get<string>('app.telegramBotToken');
-      const nodeEnv = this.configService.get<string>('app.nodeEnv');
+    // ошибки initData — BusinessException (400); сбой базы и прочее — 500 через фильтр
+    // Валидируем initData строку
+    const botToken = this.configService.get<string>('app.telegramBotToken');
+    const nodeEnv = this.configService.get<string>('app.nodeEnv');
 
-      // Мок-данные допустимы только в явном development-окружении;
-      // во всех остальных случаях подпись обязана проверяться (fail closed)
-      const shouldSkipValidation =
-        nodeEnv === 'development' && this.isMockInitData(authDto.initData);
+    // Мок-данные допустимы только в явном development-окружении;
+    // во всех остальных случаях подпись обязана проверяться (fail closed)
+    const shouldSkipValidation =
+      nodeEnv === 'development' && this.isMockInitData(authDto.initData);
 
-      if (!shouldSkipValidation) {
-        if (!botToken) {
-          throw new BusinessException(
-            'Telegram-авторизация не настроена на сервере',
-          );
-        }
-        if (!this.validateTelegramInitData(authDto.initData, botToken)) {
-          throw new BusinessException(
-            'Некорректные данные авторизации Telegram',
-          );
-        }
+    if (!shouldSkipValidation) {
+      if (!botToken) {
+        throw new BusinessException(
+          'Telegram-авторизация не настроена на сервере',
+        );
       }
+      if (!this.validateTelegramInitData(authDto.initData, botToken)) {
+        throw new BusinessException('Некорректные данные авторизации Telegram');
+      }
+    }
 
-      // Парсим данные из initData
-      const telegramData = this.parseInitData(authDto.initData);
-      const telegramUser = telegramData.user;
+    // Парсим данные из initData
+    const telegramData = this.parseInitData(authDto.initData);
+    const telegramUser = telegramData.user;
 
-      // Формируем данные пользователя
-      const telegramId = telegramUser.id.toString();
-      const telegramUsername = telegramUser.username || null;
-      const name = `${telegramUser.first_name}${telegramUser.last_name ? ' ' + telegramUser.last_name : ''}`;
+    // Формируем данные пользователя
+    const telegramId = telegramUser.id.toString();
+    const telegramUsername = telegramUser.username || null;
+    const name = `${telegramUser.first_name}${telegramUser.last_name ? ' ' + telegramUser.last_name : ''}`;
 
-      // Ищем существующего пользователя
-      let user = await this.db.user.findUnique({
-        where: { telegramId },
-        include: {
-          group: true,
-        },
-      });
+    // Ищем существующего пользователя
+    let user = await this.db.user.findUnique({
+      where: { telegramId },
+      include: {
+        group: true,
+      },
+    });
 
-      if (user) {
-        // Обновляем данные если изменились
-        if (user.telegramUsername !== telegramUsername || user.name !== name) {
-          user = await this.db.user.update({
-            where: { id: user.id },
-            data: {
-              telegramUsername,
-              name,
-              lastActivity: new Date(),
-            },
-            include: {
-              group: true,
-            },
-          });
-        }
-      } else {
-        // Создаем нового пользователя
-        user = await this.db.user.create({
+    if (user) {
+      // Обновляем данные если изменились
+      if (user.telegramUsername !== telegramUsername || user.name !== name) {
+        user = await this.db.user.update({
+          where: { id: user.id },
           data: {
-            telegramId,
             telegramUsername,
             name,
+            lastActivity: new Date(),
           },
           include: {
             group: true,
           },
         });
       }
-
-      // Генерируем JWT токен
-      const accessToken = await this.generateAccessToken(user);
-
-      return {
-        accessToken,
-        user,
-      };
-    } catch (error) {
-      if (error instanceof BusinessException) {
-        throw error;
-      }
-      throw new BusinessException('Authentication failed');
+    } else {
+      // Создаем нового пользователя
+      user = await this.db.user.create({
+        data: {
+          telegramId,
+          telegramUsername,
+          name,
+        },
+        include: {
+          group: true,
+        },
+      });
     }
+
+    // Генерируем JWT токен
+    const accessToken = await this.generateAccessToken(user);
+
+    return {
+      accessToken,
+      user,
+    };
   }
 
   /**

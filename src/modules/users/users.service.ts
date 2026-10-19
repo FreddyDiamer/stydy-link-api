@@ -76,7 +76,7 @@ export class UsersService extends BaseService {
         pagination: paginationDto,
         filter: filterDto,
       });
-      throw new BusinessException('Не удалось получить список пользователей');
+      throw error;
     }
   }
 
@@ -158,7 +158,7 @@ export class UsersService extends BaseService {
         id,
         ...updateUserDto,
       });
-      throw new BusinessException('Не удалось обновить пользователя');
+      throw error;
     }
   }
 
@@ -196,7 +196,7 @@ export class UsersService extends BaseService {
         id,
         groupId,
       });
-      throw new BusinessException('Не удалось обновить группу пользователя');
+      throw error;
     }
   }
 

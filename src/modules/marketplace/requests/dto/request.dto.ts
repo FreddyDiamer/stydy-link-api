@@ -5,11 +5,11 @@ import {
   IsOptional,
   IsNumber,
   IsUUID,
-  IsDateString,
   Min,
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsClientDate } from '@common';
 import {
   ApiProperty,
   ApiPropertyOptional,
@@ -65,12 +65,15 @@ export class CreateRequestDto {
   budget?: number;
 
   @ApiPropertyOptional({
-    description: 'Желаемый срок выполнения',
-    example: '2024-06-01T10:00:00.000Z',
+    description:
+      'Желаемый срок выполнения. ГГГГ-ММ-ДД принимается как конец этого дня по Москве; не раньше сегодняшнего дня',
+    example: '2026-11-01T20:59:59.999Z',
+    type: String,
+    format: 'date-time',
   })
   @IsOptional()
-  @IsDateString()
-  deadline?: string;
+  @IsClientDate()
+  deadline?: Date;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -14,7 +14,11 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
 import { TutorsModule } from './modules/tutors/tutors.module';
 import { ParserModule } from './modules/parser/parser.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
-import { JwtAuthGuard, TransformInterceptor } from '@common';
+import {
+  JwtAuthGuard,
+  TransformInterceptor,
+  requestIdMiddleware,
+} from '@common';
 import { appConfig, databaseConfig, jwtConfig } from './config';
 
 @Module({
@@ -53,4 +57,9 @@ import { appConfig, databaseConfig, jwtConfig } from './config';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /** X-Request-Id на каждый запрос — и в проде, и в e2e (оба собирают AppModule) */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(requestIdMiddleware).forRoutes('*');
+  }
+}

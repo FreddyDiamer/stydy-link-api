@@ -7,11 +7,10 @@ import {
   IsNumber,
   Min,
   Max,
-  IsDateString,
   IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PaginationDto } from '@common';
+import { IsClientDate, PaginationDto } from '@common';
 
 export type ResponseStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 
@@ -44,12 +43,15 @@ export class CreateRequestResponseDto {
   price?: number;
 
   @ApiPropertyOptional({
-    description: 'Предложенный дедлайн',
-    example: '2024-06-01T10:00:00.000Z',
+    description:
+      'Предложенный дедлайн. ГГГГ-ММ-ДД принимается как конец этого дня по Москве; не раньше сегодняшнего дня',
+    example: '2026-11-01T20:59:59.999Z',
+    type: String,
+    format: 'date-time',
   })
   @IsOptional()
-  @IsDateString()
-  proposedDeadline?: string;
+  @IsClientDate()
+  proposedDeadline?: Date;
 }
 
 /**
@@ -74,12 +76,15 @@ export class UpdateRequestResponseDto {
   price?: number;
 
   @ApiPropertyOptional({
-    description: 'Предложенный дедлайн',
-    example: '2024-06-01T10:00:00.000Z',
+    description:
+      'Предложенный дедлайн. ГГГГ-ММ-ДД принимается как конец этого дня по Москве; не раньше сегодняшнего дня',
+    example: '2026-11-01T20:59:59.999Z',
+    type: String,
+    format: 'date-time',
   })
   @IsOptional()
-  @IsDateString()
-  proposedDeadline?: string;
+  @IsClientDate()
+  proposedDeadline?: Date;
 }
 
 export class RequestResponseFilterDto extends PaginationDto {

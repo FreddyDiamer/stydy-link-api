@@ -11,6 +11,8 @@ import {
   ForbiddenException,
   NotFoundException,
   PaginatedResult,
+  assertDeadlineNotPast,
+  assertChangedDeadlineNotPast,
 } from '@common';
 import { Prisma, RequestResponse, User } from '@prisma/client';
 import { NotificationService } from '../../notifications/notification.service';
@@ -54,6 +56,7 @@ export class RequestResponsesService extends BaseService {
     });
     if (exists)
       throw new BusinessException('Вы уже откликнулись на эту заявку.');
+    assertDeadlineNotPast(dto.proposedDeadline);
     // Создание отклика
     const created = await this.db.requestResponse.create({
       data: {
@@ -238,6 +241,7 @@ export class RequestResponsesService extends BaseService {
         'Нельзя изменять отклик после принятия решения по нему',
       );
     }
+    assertChangedDeadlineNotPast(dto.proposedDeadline, item.proposedDeadline);
     return this.db.requestResponse.update({
       where: { id },
       data: { ...dto, updatedAt: new Date() },

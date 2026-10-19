@@ -107,9 +107,7 @@ export class TeacherSubjectsService extends BaseService {
         error as Error,
         createTeacherSubjectDto,
       );
-      throw new BusinessException(
-        'Не удалось создать связь преподавателя с предметом',
-      );
+      throw error;
     }
   }
 
@@ -193,9 +191,7 @@ export class TeacherSubjectsService extends BaseService {
           filter: filterDto,
         },
       );
-      throw new BusinessException(
-        'Не удалось получить список связей преподавателей с предметами',
-      );
+      throw error;
     }
   }
 
@@ -394,9 +390,7 @@ export class TeacherSubjectsService extends BaseService {
           ...updateTeacherSubjectDto,
         },
       );
-      throw new BusinessException(
-        'Не удалось обновить связь преподавателя с предметом',
-      );
+      throw error;
     }
   }
 
@@ -464,9 +458,7 @@ export class TeacherSubjectsService extends BaseService {
         error as Error,
         { id },
       );
-      throw new BusinessException(
-        'Не удалось удалить связь преподавателя с предметом',
-      );
+      throw error;
     }
   }
 
@@ -501,9 +493,7 @@ export class TeacherSubjectsService extends BaseService {
       this.logError('Ошибка массового создания связей', error as Error, {
         relationships,
       });
-      throw new BusinessException(
-        'Не удалось создать связи преподавателей с предметами',
-      );
+      throw error;
     }
   }
 

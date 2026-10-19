@@ -15,6 +15,6 @@ The state of testing in this project and the conventions to follow when tests ar
 
 ## The short version
 
-`pnpm test` runs **20 unit suites (200 tests)** covering auth, deals, requests, both response flows, services, reviews, user privacy and the education catalog reads — they mock the Prisma layer, so no database is needed. `pnpm run test:e2e` adds **23 HTTP-level tests** against a real Postgres (setup in [testing-status.md](testing-status.md)).
+`pnpm test` runs **22 unit suites (225 tests)** covering auth, deals, requests, both response flows, services, reviews, user privacy, the education catalog reads, client dates and error handling — they mock the Prisma layer, so no database is needed. `pnpm run test:e2e` adds **28 HTTP-level tests** against a real Postgres (setup in [testing-status.md](testing-status.md)).
 
 Uncovered areas — parser sync and notification delivery — still need lint, build, and manual endpoint checks against a running dev server (Swagger at `/api/docs`).

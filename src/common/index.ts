@@ -14,6 +14,7 @@ export * from './exceptions/business.exception';
 export * from './decorators/current-user.decorator';
 export * from './decorators/public.decorator';
 export * from './decorators/api-response.decorator';
+export * from './decorators/client-date.decorator';
 
 // Guards
 export * from './guards/jwt-auth.guard';
@@ -22,6 +23,13 @@ export * from './guards/admin.guard';
 
 // Pipes
 export * from './pipes/parse-object-id.pipe';
+export * from './pipes/validation.pipe';
+
+// Middleware
+export * from './middleware/request-id.middleware';
+
+// Utils
+export * from './utils/client-date';
 
 // Interceptors
 export * from './interceptors/transform.interceptor';

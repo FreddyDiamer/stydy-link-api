@@ -9,6 +9,11 @@ import {
 import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 import { BusinessException } from '../exceptions/business.exception';
+import {
+  RequestValidationException,
+  type FieldError,
+} from '../pipes/validation.pipe';
+import type { RequestWithId } from '../middleware/request-id.middleware';
 
 /** Ответ HttpException: строка или объект с message (строкой или массивом) */
 type HttpErrorBody = string | { message?: string | string[]; error?: string };
@@ -41,7 +46,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request & { user?: { id?: string } }>();
+    const request = ctx.getRequest<
+      Request & RequestWithId & { user?: { id?: string } }
+    >();
 
     let status: number;
     let message: string | string[];
@@ -75,16 +82,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message = prismaError.message;
       error = prismaError.error;
     } else {
-      // Неожиданные ошибки
+      // Неожиданные ошибки — это баг сервера, а не клиента: 500 и лог со стеком.
+      // Сюда же попадает PrismaClientValidationError: значит, валидация DTO
+      // пропустила то, что не должна была
       status = HttpStatus.INTERNAL_SERVER_ERROR;
-      message = 'Internal server error';
+      message = 'Внутренняя ошибка сервера. Попробуйте позже';
       error = 'InternalServerError';
 
-      // Логируем неожиданные ошибки
       this.logger.error(
         `Unexpected error: ${exception instanceof Error ? exception.message : String(exception)}`,
         exception instanceof Error ? exception.stack : undefined,
         {
+          requestId: request.requestId,
           url: request.url,
           method: request.method,
           user: request.user?.id,
@@ -92,13 +101,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       );
     }
 
+    const fieldErrors: { field?: string; errors?: FieldError[] } =
+      exception instanceof RequestValidationException
+        ? { field: exception.errors[0]?.field, errors: exception.errors }
+        : {};
+
     const errorResponse = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
+      requestId: request.requestId,
       error,
       message,
+      ...fieldErrors,
     };
 
     response.status(status).json(errorResponse);

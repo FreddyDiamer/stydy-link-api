@@ -88,6 +88,67 @@ describe('Маркетплейс (e2e)', () => {
     return body<{ id: string }>(response);
   };
 
+  describe('срок заявки и ошибки', () => {
+    const postRequest = (extra: Record<string, unknown>) =>
+      request(server)
+        .post('/api/marketplace/requests')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ studentId, subjectId, teacherId, ...extra });
+
+    /** ГГГГ-ММ-ДД по Москве со сдвигом в днях от сегодняшнего */
+    const moscowDate = (days: number) =>
+      new Date(Date.now() + 3 * 60 * 60 * 1000 + days * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+
+    it('дата без времени (<input type="date">) сохраняется как конец дня по Москве', async () => {
+      const day = moscowDate(3);
+
+      const response = await postRequest({ deadline: day }).expect(201);
+
+      expect(body<{ deadline: string }>(response).deadline).toBe(
+        new Date(`${day}T23:59:59.999+03:00`).toISOString(),
+      );
+    });
+
+    it('сегодняшняя дата проходит', async () => {
+      await postRequest({ deadline: moscowDate(0) }).expect(201);
+    });
+
+    it('прошедший срок — 400 с текстом про срок', async () => {
+      const response = await postRequest({ deadline: moscowDate(-1) }).expect(
+        400,
+      );
+
+      expect(response.body).toMatchObject({
+        message: 'Срок уже прошёл — выберите сегодняшнюю или будущую дату',
+      });
+    });
+
+    it('неразборчивая дата — 400 с русским текстом, полем и requestId', async () => {
+      const response = await postRequest({ deadline: '14.10.2026' })
+        .set('X-Request-Id', 'e2e-request-1')
+        .expect(400);
+
+      expect(response.headers['x-request-id']).toBe('e2e-request-1');
+      expect(response.body).toMatchObject({
+        error: 'VALIDATION_ERROR',
+        message: 'Срок: нужна дата — ГГГГ-ММ-ДД или полная дата ISO-8601',
+        field: 'deadline',
+        requestId: 'e2e-request-1',
+      });
+    });
+
+    it('requestId генерируется сам, если клиент его не прислал', async () => {
+      const response = await request(server)
+        .get('/api/marketplace/requests')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(200);
+
+      expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+    });
+  });
+
   it('проводит петлю от заявки до двух отзывов', async () => {
     const created = await createRequest();
     expect(created.status).toBe('OPEN');

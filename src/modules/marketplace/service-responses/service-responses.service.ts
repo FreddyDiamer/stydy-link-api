@@ -13,6 +13,8 @@ import {
   NotFoundException,
   PaginatedResult,
   PaginationDto,
+  assertDeadlineNotPast,
+  assertChangedDeadlineNotPast,
 } from '@common';
 import { NotificationService } from '../../notifications/notification.service';
 
@@ -78,6 +80,8 @@ export class ServiceResponsesService extends BaseService {
           'Вы уже откликнулись на эту услугу. Можно редактировать существующий отклик.',
         );
       }
+
+      assertDeadlineNotPast(createServiceResponseDto.proposedDeadline);
 
       // Создаем отклик
       const serviceResponse = await this.db.serviceResponse.create({
@@ -172,7 +176,7 @@ export class ServiceResponsesService extends BaseService {
         error instanceof Error ? error : undefined,
         createServiceResponseDto,
       );
-      throw new BusinessException('Не удалось создать отклик на услугу');
+      throw error;
     }
   }
 
@@ -295,7 +299,7 @@ export class ServiceResponsesService extends BaseService {
           filter: filterDto,
         },
       );
-      throw new BusinessException('Не удалось получить список откликов');
+      throw error;
     }
   }
 
@@ -378,6 +382,12 @@ export class ServiceResponsesService extends BaseService {
         );
       }
 
+      // Срок проверяем, только если его меняют
+      assertChangedDeadlineNotPast(
+        updateServiceResponseDto.proposedDeadline,
+        existingResponse.proposedDeadline,
+      );
+
       const updatedResponse = await this.db.serviceResponse.update({
         where: { id },
         data: {
@@ -456,7 +466,7 @@ export class ServiceResponsesService extends BaseService {
           ...updateServiceResponseDto,
         },
       );
-      throw new BusinessException('Не удалось обновить отклик на услугу');
+      throw error;
     }
   }
 
@@ -667,7 +677,7 @@ export class ServiceResponsesService extends BaseService {
           id,
         },
       );
-      throw new BusinessException('Не удалось удалить отклик на услугу');
+      throw error;
     }
   }
 
@@ -720,7 +730,7 @@ export class ServiceResponsesService extends BaseService {
         serviceId,
         excludeIds,
       });
-      throw new BusinessException('Не удалось обновить статусы откликов');
+      throw error;
     }
   }
 }

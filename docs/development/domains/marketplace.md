@@ -46,3 +46,4 @@ Every accept/reject/create/complete transition fires a fire-and-forget Telegram 
 - Including whole `User` rows (`student: true`) in responses — use `PUBLIC_USER_SELECT` from `users.service.ts`; the full row carries `telegramId`, `balance` and notification settings
 - Forgetting the ownership check on a new mutating endpoint — copy the pattern from `ServiceResponsesService.accept()`
 - Treating `budgetType` / `proposedDeadlineType` as authoritative — the real values are `price` and `proposedDeadline`
+- Accepting a deadline in the past — `Request.deadline` and both `proposedDeadline`s are checked against the start of today in Moscow on create, and on update only when the value changes (an old past deadline does not block editing the description); a bare `YYYY-MM-DD` means the end of that day in Moscow

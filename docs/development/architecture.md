@@ -34,9 +34,10 @@ Shared code lives in `src/common/` (decorators, guards, pipes, filters, intercep
 
 Every HTTP request passes through, in order:
 
+0. **`requestIdMiddleware`** (applied to every route in `AppModule.configure`, so prod and e2e get it alike) — takes `X-Request-Id` from the request (letters, digits, `_`, `-`, up to 128 chars) or generates a UUID, stores it on `request.requestId` and echoes it in the `X-Request-Id` response header.
 1. **`ThrottlerGuard`** (global `APP_GUARD`, registered before the JWT guard) — 100 requests per minute per IP (`ThrottlerModule.forRoot` in `src/app.module.ts`); `POST /auth/telegram` is tightened to 10 via `@Throttle`. `main.ts` sets `trust proxy` so the client IP comes from Caddy's `X-Forwarded-For`. Over the limit → 429.
 2. **`JwtAuthGuard`** (global `APP_GUARD`) — requires a Bearer JWT unless the handler or controller is marked `@Public()`. On success, `request.user` is the full Prisma `User` (loaded by `src/modules/auth/strategies/jwt.strategy.ts`); read it with `@CurrentUser()`.
-3. **`ValidationPipe`** (global, in `main.ts`) — `transform` + `whitelist` + `forbidNonWhitelisted`: unknown body fields are rejected with 400, DTOs are class instances.
+3. **`ValidationPipe`** (`createValidationPipe()` from `src/common/pipes/validation.pipe.ts`, used by `main.ts` and the e2e app) — `transform` + `whitelist` + `forbidNonWhitelisted`: unknown fields are rejected, DTOs are class instances. Its `exceptionFactory` throws `RequestValidationException` (400, `VALIDATION_ERROR`) with a Russian `message` about the first failing field (`«Срок: нужна дата — …»`), plus `field` and the full `errors: [{ field, message }]`. Russian messages written in decorators (`@Min(100, { message: '…' })`) are kept as is.
 4. **Controller → Service** — controllers stay thin (routing, ownership checks, Swagger decorators); business logic and Prisma queries live in services.
 5. **`TransformInterceptor`** (global `APP_INTERCEPTOR`) — wraps every successful response:
 
@@ -49,7 +50,7 @@ Every HTTP request passes through, in order:
 }
 ```
 
-6. **`GlobalExceptionFilter`** — converts `BusinessException` subclasses and `HttpException`s into a standard error shape (`statusCode`, `error`, `message`, `path`, `timestamp`). Prisma's unique-key violation (`P2002`, e.g. two identical requests racing) becomes 409 `CONFLICT` and a vanished record (`P2025`) 404; anything else unexpected becomes 500 and is logged with the request context.
+6. **`GlobalExceptionFilter`** — converts `BusinessException` subclasses and `HttpException`s into a standard error shape (`statusCode`, `error`, `message`, `path`, `method`, `timestamp`, `requestId`; validation errors add `field` and `errors`). Prisma's unique-key violation (`P2002`, e.g. two identical requests racing) becomes 409 `CONFLICT` and a vanished record (`P2025`) 404. Anything else — including `PrismaClientValidationError`, which means a DTO let bad input through — is a server bug: 500 with `«Внутренняя ошибка сервера. Попробуйте позже»`, logged with the stack, `requestId`, URL, method and user.
 
 ## Configuration
 

@@ -69,7 +69,7 @@ export class SubjectsService extends BaseService {
         error as Error,
         createSubjectDto,
       );
-      throw new BusinessException('Не удалось создать предмет');
+      throw error;
     }
   }
 
@@ -99,7 +99,7 @@ export class SubjectsService extends BaseService {
         pagination: paginationDto,
         filter: filterDto,
       });
-      throw new BusinessException('Не удалось получить список предметов');
+      throw error;
     }
   }
 
@@ -206,7 +206,7 @@ export class SubjectsService extends BaseService {
         id,
         ...updateSubjectDto,
       });
-      throw new BusinessException('Не удалось обновить предмет');
+      throw error;
     }
   }
 
@@ -267,7 +267,7 @@ export class SubjectsService extends BaseService {
         throw error;
       }
       this.logError('Ошибка удаления предмета', error as Error, { id });
-      throw new BusinessException('Не удалось удалить предмет');
+      throw error;
     }
   }
 
